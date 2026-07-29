@@ -15,9 +15,11 @@
   "dependencies": {
     "@clack/core": "^1.4.3",
     "@clack/prompts": "^1.7.0",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
     "@types/node": "^26.1.2",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
-    "figlet": "^1.11.4"
+    "figlet": "^1.11.4",
+    "ollama": "^0.6.3"
   }
 }

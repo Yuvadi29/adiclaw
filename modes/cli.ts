@@ -29,6 +29,7 @@ export async function runCliMode() {
 
         if(mode === "agent"){
             console.log("Agent Mode")
+            // await runAgentMode();
         }
         if(mode === "ask"){
             console.log("Ask Mode")

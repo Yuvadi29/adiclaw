@@ -1,0 +1,43 @@
+import { isMutationType, type ActionLog, type ActionStatus } from "./types";
+
+// This tracker will be an append only tracker for storing all our logs
+export class ActionTracker {
+    private actions: ActionLog[] = [];
+
+    // This is a log method, which will store the logs
+    log(
+        entry: Omit<ActionLog, 'id' | 'timestamp'> & {
+            id?: string;
+            timestamp?: Date;
+        },
+    ): ActionLog {
+        const action: ActionLog = {
+            id: entry?.id ?? `action_${this.actions.length}`,
+            timestamp: entry?.timestamp ?? new Date(),
+            type: entry.type,
+            path: entry.path,
+            details: { ...entry.details },
+            status: entry.status,
+            userApproved: entry.userApproved
+        };
+        this.actions.push(action);
+        return action;
+    };
+
+    getActions(): readonly ActionLog[] {
+        return this.actions;
+    };
+
+    getPendingMutations(): ActionLog[] {
+        return this.actions.filter((a) => {
+            isMutationType(a.type) && a.status === "pending";
+        });
+    };
+
+    updateStatus(id: string, status: ActionStatus, userApproved?: boolean): void {
+        const a = this.actions.find((x) => x.id === id);
+        if (!a) return;
+        a.status = status;
+        if (userApproved !== undefined) a.userApproved = userApproved;
+    }
+}
