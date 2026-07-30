@@ -6,22 +6,64 @@ import { runCliMode } from "../modes/cli";
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
 const PRIMARY = chalk.hex("#E0E7FF");
+const GLOW = [
+    chalk.hex("#A5B4FC"),
+    chalk.hex("#C7D2FE"),
+    chalk.hex("#E0E7FF"),
+];
 
-function printBannerWithShadow(ascii: string) {
-    const bannerLines = ascii.replace(/\s+$/, '').split('\n');
+async function printBannerWithShadow(ascii: string) {
+    const bannerLines = ascii.replace(/\s+$/, "").split("\n");
+
     const maxLen = Math.max(...bannerLines.map((l) => l.length), 0);
     const rowWidth = maxLen + 2;
 
+    // Draw shadow first
     for (const line of bannerLines) {
-        console.log(SHADOW('  ' + line).padEnd(rowWidth))
-    };
+        console.log(SHADOW("  " + line).padEnd(rowWidth));
+    }
 
+    // Go back to top
     process.stdout.write(`\x1b[${bannerLines.length}A`);
-    for (const line of bannerLines) {
-        console.log(PRIMARY('  ' + line).padEnd(rowWidth));
-    };
-    console.log();
 
+    // Reveal the foreground line-by-line
+    for (const color of GLOW) {
+
+        process.stdout.write(`\x1b[${bannerLines.length + 1}A`);
+
+        for (const line of bannerLines) {
+            console.log(color("  " + line).padEnd(rowWidth));
+        }
+
+        await Bun.sleep(90);
+
+    }
+
+    console.log();
+}
+
+async function bootSequence() {
+
+    const steps = [
+        "Initializing runtime",
+        "Loading AI models",
+        "Loading tools",
+        "Preparing workspace",
+    ];
+
+    for (const step of steps) {
+
+        process.stdout.write(chalk.gray(`○ ${step}...`));
+
+        await Bun.sleep(250);
+
+        process.stdout.write(
+            `\r${chalk.green("✔")} ${step}\n`
+        );
+
+    }
+
+    console.log();
 }
 
 export async function runWakeUp() {
@@ -36,7 +78,13 @@ export async function runWakeUp() {
             horizontalLayout: "full"
         })
     }
-    printBannerWithShadow(ascii);
+    await printBannerWithShadow(ascii);
+
+    await bootSequence();
+    console.log(chalk.gray(">_"));
+    await Bun.sleep(400);
+    process.stdout.write("\x1b[1A");
+    process.stdout.write("\x1b[2K");
 
     const mode = await select({
         message: "Which mode you wish to proceed with ?",
@@ -63,7 +111,7 @@ export async function runWakeUp() {
 
     if (mode === "cli") {
         await runCliMode();
-    } else if(mode === "telegram") {
+    } else if (mode === "telegram") {
         console.log(chalk.dim("Starting Telegram Mode..."));
     }
 }

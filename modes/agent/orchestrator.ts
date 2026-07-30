@@ -10,6 +10,7 @@ import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "./approval";
 import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
+import { activityEvents } from "./activity-events";
 
 function getToolMessage(toolName: string, input: any): string {
     switch (toolName) {
@@ -62,6 +63,10 @@ function getToolMessage(toolName: string, input: any): string {
 
 export async function runAgentMode() {
     console.log(chalk.bold("Running Agent Mode"));
+    activityEvents.onStart(msg => activity.update(msg));
+    activityEvents.onFinish(msg => activity.success(msg));
+    activityEvents.onFinish(msg => activity.fail(msg));
+
 
     const goal = await text({
         message: "What would you want the agent to do ?",

@@ -28,6 +28,8 @@ export class ActivityRenderer {
     private frame = 0;
     private msgIndex = 0;
 
+    private isBusy = false;
+
     private current = "Thinking...";
     private recent: string[] = [];
     private started = false;
@@ -49,14 +51,16 @@ export class ActivityRenderer {
         this.timer = setInterval(() => {
             this.frame = (this.frame + 1) % FRAMES.length;
 
-            if (this.frame % 20 === 0) {
-                this.msgIndex = (this.msgIndex + 1) % THINKING_MESSAGES.length;
+            if (!this.isBusy) {
+                if (this.frame % 20 === 0) {
+                    this.msgIndex = (this.msgIndex + 1) % THINKING_MESSAGES.length;
 
-                if (
-                    this.current === "Thinking..." ||
-                    THINKING_MESSAGES.includes(this.current)
-                ) {
-                    this.current = THINKING_MESSAGES[this.msgIndex] ?? "Thinking...";
+                    if (
+                        this.current === "Thinking..." ||
+                        THINKING_MESSAGES.includes(this.current)
+                    ) {
+                        this.current = THINKING_MESSAGES[this.msgIndex] ?? "Thinking...";
+                    }
                 }
             }
 
@@ -66,6 +70,7 @@ export class ActivityRenderer {
 
     update(message: string) {
         this.current = message;
+        this.isBusy = true;
         this.render();
     }
 
@@ -75,7 +80,7 @@ export class ActivityRenderer {
         );
 
         this.recent = this.recent.slice(0, 6);
-
+        this.isBusy = false;
         this.current = "Thinking...";
         this.render();
     }
@@ -86,7 +91,7 @@ export class ActivityRenderer {
         );
 
         this.recent = this.recent.slice(0, 6);
-
+        this.isBusy = false;
         this.current = "Thinking...";
         this.render();
     }
