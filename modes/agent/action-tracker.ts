@@ -29,9 +29,9 @@ export class ActionTracker {
     };
 
     getPendingMutations(): ActionLog[] {
-        return this.actions.filter((a) => {
-            isMutationType(a.type) && a.status === "pending";
-        });
+        return this.actions.filter(
+            (a) => isMutationType(a.type) && a.status === "pending",
+        );
     };
 
     updateStatus(id: string, status: ActionStatus, userApproved?: boolean): void {
