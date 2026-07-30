@@ -4,6 +4,8 @@ import { defaultAgentConfig } from "./types";
 import { ActionTracker } from "./action-tracker";
 import { ToolExecutor } from "./tool-executor";
 import { createAgentTools } from "./agent-tools";
+import { stepCountIs, ToolLoopAgent } from "ai";
+import { getAgentModel } from "../../ai/ai.config";
 
 export async function runAgentMode() {
     console.log(chalk.bold("Running Agent Mode"));
@@ -21,4 +23,31 @@ export async function runAgentMode() {
     const executor = new ToolExecutor(tracker, config);
     // This is where we will be creating the tools that the agent can use
     const tools = createAgentTools(executor);
+    // Create the tool loop
+    const agent = new ToolLoopAgent({
+        model: getAgentModel(),
+        stopWhen: stepCountIs(40),
+        instructions: [
+            `Workspace root: ${config.codebasePath}`,
+            "All mutations are staged until approval.",
+        ].join("\n"),
+        tools,
+    });
+
+    // Display actions as they happen, then ask the user to approve the action after the agent is done with its job
+    const result = await agent.generate({
+        prompt: goal.trim(),
+        onStepFinish: ({ toolCalls }) => {
+            for (const tc of toolCalls) {
+                const preview = JSON.stringify(tc.input).slice(0, 160);
+                console.log(
+                    chalk.green(' ✔️'),
+                    chalk.bold(String(tc.toolName)),
+                    chalk.dim(preview + (preview.length >= 160 ? "..." : ""))
+                )
+            }
+        }
+    });
+
+    if(result.text?.trim()) console.log(result.text);
 }
