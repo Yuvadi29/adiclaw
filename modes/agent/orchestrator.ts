@@ -8,6 +8,7 @@ import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../../ai/ai.config";
 import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "./approval";
+import { createWebTools } from "../plan/web-tools";
 
 export async function runAgentMode() {
     console.log(chalk.bold("Running Agent Mode"));
@@ -23,8 +24,13 @@ export async function runAgentMode() {
     const tracker = new ActionTracker();
     //    This will be our tool executor which takes care of executing the tools
     const executor = new ToolExecutor(tracker, config);
+    
+    const hasWeb = !!process.env.FIRECRAWL_API_KEY;
     // This is where we will be creating the tools that the agent can use
-    const tools = createAgentTools(executor);
+    const tools = {
+        ...createAgentTools(executor),
+        ...(hasWeb ? createWebTools(tracker) : {}),
+    };
     // Create the tool loop
     const agent = new ToolLoopAgent({
         model: getAgentModel(),
@@ -32,6 +38,7 @@ export async function runAgentMode() {
         instructions: [
             `Workspace root: ${config.codebasePath}`,
             "All mutations are staged until approval.",
+            hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
         ].join("\n"),
         tools,
     });
@@ -41,6 +48,7 @@ export async function runAgentMode() {
         prompt: goal.trim(),
         onStepFinish: ({ toolCalls }) => {
             for (const tc of toolCalls) {
+                if (!tc) continue;
                 const preview = JSON.stringify(tc.input).slice(0, 160);
                 console.log(
                     chalk.green(' ✔️'),
