@@ -1,22 +1,13 @@
-import { select, isCancel, spinner } from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
-import { runCliMode } from "../modes/cli";
-import { checkOllama } from "../ai/ollama";
-import { type AIProvider, PROVIDERS } from "../ai/provider";
 import { aiSession } from "../ai/session";
-import { activity } from "./activity";
 import { sessionTracker } from "../ai/session/session-tracker";
-import { shutdown } from "../ai/session/shutdown";
+import { loadConfig } from "../config/config";
+import { runREPL } from "./repl";
 
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
 const PRIMARY = chalk.hex("#E0E7FF");
-const GLOW = [
-    chalk.hex("#A5B4FC"),
-    chalk.hex("#C7D2FE"),
-    chalk.hex("#E0E7FF"),
-];
 
 async function printBannerWithShadow(ascii: string) {
     const bannerLines = ascii.replace(/\s+$/, "").split("\n");
@@ -59,18 +50,15 @@ async function printBannerWithShadow(ascii: string) {
 }
 
 async function bootSequence() {
+    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
     const steps = [
         "Initializing runtime",
-        "Loading AI models",
         "Loading tools",
     ];
 
-    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
     for (const step of steps) {
         let currentFrame = 0;
-
-        // Random duration between 300 and 700ms
         const duration = 300 + Math.random() * 400;
         const endTime = Date.now() + duration;
 
@@ -90,152 +78,38 @@ async function bootSequence() {
     console.log();
 }
 
-function formatBytes(bytes: number): string {
-    if(bytes < 1024) return `${bytes} B`;
-
-    const units = ["KB", "MB", "GB"];
-    let size = bytes;
-    let unit = -1;
-
-    do {
-        size /= 1024;
-        unit++;
-    } while (size >= 1024 && unit < units.length -1 );
-
-    return `${size.toFixed(1)} ${units[unit]}`;
-}
-
 export async function runWakeUp() {
-    let ascii: string
+    // Banner
+    let ascii: string;
     try {
-        ascii = figlet.textSync("AdiClaw", {
-            font: BANNER_FONT,
-        })
-    } catch (error) {
-        ascii = figlet.textSync("AdiClaw", {
-            font: "Standard",
-            horizontalLayout: "full"
-        })
+        ascii = figlet.textSync("AdiClaw", { font: BANNER_FONT });
+    } catch {
+        ascii = figlet.textSync("AdiClaw", { font: "Standard", horizontalLayout: "full" });
     }
     await printBannerWithShadow(ascii);
 
-    const provider = await select<AIProvider>({
-        message: "Choose AI Provider",
-        options: PROVIDERS.map((p) => ({
-
-            value: p.id,
-            label: p.name,
-            hint: p.description,
-        })),
+    // Load config from env (no interactive prompts)
+    const config = loadConfig();
+    aiSession.set({
+        provider: config.provider,
+        model: config.model,
+        providerName: config.providerName,
     });
 
-    if (isCancel(provider)) {
-        console.log(chalk.dim("\nGoodbye"));
-        shutdown("cancelled", 0);
-        return;
-    }
-
-    if (provider === "openrouter") {
-        aiSession.set({
-            provider: "openrouter",
-            providerName: "OpenRouter",
-            model: "openrouter/free"
-        });
-        activity.setSession("OpenRouter", "openrouter/free");
-    }
-
-    if (provider === "ollama") {
-        const s = spinner();
-        s.start("Checking Ollama...");
-
-        const status = await checkOllama();
-        if (!status.running) {
-            s.stop("Ollama not detected");
-            console.log();
-            console.log(
-                chalk.red("⚠️ Ollama is not running. Please install and run Ollama (ollama serve) to use local models.")
-            );
-            console.log();
-            return;
-        }
-        s.stop(`Found ${status.models?.length ?? 0} local model(s)`);
-
-        if (!status.models || status.models.length === 0) {
-            console.log(chalk.yellow("⚠️ No local models found. Please pull a model (e.g., ollama run llama3)."));
-            shutdown("crashed", 1);
-            return;
-        }
-
-        const model = await select<string>({
-            message: "Choose Ollama Model",
-            options: status.models.map((m) => ({
-                value: m.name,
-                label: m.name,
-                hint: formatBytes(m.size),
-            })),
-        });
-
-        if (isCancel(model)) {
-            shutdown("cancelled", 0);
-            return;
-        }
-
-        aiSession.set({
-            provider: "ollama",
-            providerName: "Ollama",
-            model,
-        });
-        activity.setSession("Ollama", model);
-    }
-
-    const sess = aiSession.get();
-    sessionTracker.start(sess.providerName || sess.provider, sess.model);
+    sessionTracker.start(config.providerName, config.model);
 
     await bootSequence();
-    
-    // Perform workspace indexing
+
+    // Workspace indexing
     console.log(chalk.gray("Indexing workspace..."));
     const { scan } = await import("../workspace/scanner");
     await scan(process.cwd());
 
-    console.log(chalk.gray(">_"));
-    await Bun.sleep(400);
-    process.stdout.write("\x1b[1A");
-    process.stdout.write("\x1b[2K");
+    // Show active config
+    console.log(
+        chalk.dim(`  Provider: ${chalk.white(config.providerName)}  Model: ${chalk.white(config.model)}\n`)
+    );
 
-    const mode = await select({
-        message: "Which mode you wish to proceed with ?",
-        options: [
-            {
-                value: "cli",
-                label: "CLI Mode"
-            },
-            {
-                value: "telegram",
-                label: "Telegram Mode"
-            },
-            {
-                value: "exit",
-                label: "Exit"
-            }
-        ]
-    });
-
-    if (isCancel(mode)) {
-        console.log(chalk.dim("\n Goodbye.... \n"));
-        shutdown("cancelled", 0);
-        return;
-    }
-    
-    if (mode === "exit") {
-        console.log(chalk.dim("\n Goodbye.... \n"));
-        shutdown("completed", 0);
-        return;
-    }
-
-    if (mode === "cli") {
-        await runCliMode();
-    } else if (mode === "telegram") {
-        console.log(chalk.dim("Starting Telegram Mode..."));
-    }
+    // Enter REPL
+    await runREPL();
 }
