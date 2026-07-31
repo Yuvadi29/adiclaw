@@ -101,66 +101,91 @@ export async function runAgentMode() {
     });
 
     // Display actions as they happen, then ask the user to approve the action after the agent is done with its job
-    let result;
+    let messages: any[] = [];
+    let currentInput = goal.trim();
 
-    try {
-        //Loader
-        activity.start("Thinking...");
+    while (true) {
+        let result;
 
-        const allToolCalls: { toolName: string, input: any }[] = [];
+        try {
+            //Loader
+            activity.start("Thinking...");
 
-        result = await agent.generate({
-            prompt: goal.trim(),
-            onStepFinish: ({ toolCalls, usage }) => {
-                if (usage) {
-                    const u = usage as any;
-                    sessionTracker.addTokens(
-                        u.promptTokens ?? u.inputTokens ?? 0,
-                        u.completionTokens ?? u.outputTokens ?? 0,
+            const allToolCalls: { toolName: string, input: any }[] = [];
+
+            const generateOpts: any = {
+                onStepFinish: ({ toolCalls, usage }: any) => {
+                    if (usage) {
+                        const u = usage as any;
+                        sessionTracker.addTokens(
+                            u.promptTokens ?? u.inputTokens ?? 0,
+                            u.completionTokens ?? u.outputTokens ?? 0,
+                        );
+                    }
+                    for (const tc of toolCalls) {
+                        if (!tc) continue;
+                        sessionTracker.incrementToolCalls();
+                        allToolCalls.push(tc);
+                    }
+                }
+            };
+
+            if (messages.length > 0) {
+                generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: currentInput }] }];
+            } else {
+                generateOpts.prompt = currentInput;
+            }
+
+            result = await agent.generate(generateOpts);
+
+            activity.stop("Agent Finished");
+
+            if (allToolCalls.length > 0) {
+                console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+                for (const tc of allToolCalls) {
+                    const preview = JSON.stringify(tc.input).slice(0, 80);
+                    console.log(
+                        chalk.green(' ✔️'),
+                        chalk.bold(String(tc.toolName)),
+                        chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
                     );
                 }
-                for (const tc of toolCalls) {
-                    if (!tc) continue;
-                    allToolCalls.push(tc);
-                }
+                console.log();
             }
+        } catch (err) {
+            activity.fail("Agent Failed");
+            activity.stop();
+            throw err;
+        }
+
+        if (result.text?.trim()) console.log(renderTerminalMarkdown(result.text));
+
+        messages = result.response.messages;
+
+        // Approval Flow 
+        const ok = await runApprovalFlow(tracker);
+        if (!ok) {
+            executor.clearStaging();
+        } else {
+            const { errors } = executor.applyApprovedFromTracker();
+            if (errors.length) {
+                console.log(chalk.red("\nSome operations reported errors:\n"));
+                for (const e of errors) {
+                    console.log(chalk.red(` ⏺ ${e}`));
+                }
+            } else {
+                console.log(chalk.green("\n✔️ Applied.\n"));
+            }
+            executor.clearStaging();
+        }
+
+        const nextInput = await text({
+            message: "Continue chatting? (leave empty to exit)"
         });
 
-        activity.stop("Agent Finished");
-
-        if (allToolCalls.length > 0) {
-            console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
-            for (const tc of allToolCalls) {
-                const preview = JSON.stringify(tc.input).slice(0, 80);
-                console.log(
-                    chalk.green(' ✔️'),
-                    chalk.bold(String(tc.toolName)),
-                    chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
-                );
-            }
-            console.log();
+        if (isCancel(nextInput) || !(nextInput as string).trim()) {
+            break;
         }
-    } catch (err) {
-        activity.fail("Agent Failed");
-        activity.stop();
-        throw err;
+        currentInput = (nextInput as string).trim();
     }
-
-    if (result.text?.trim()) console.log(renderTerminalMarkdown(result.text));
-
-    // Approval Flow 
-    const ok = await runApprovalFlow(tracker);
-    if (!ok) return executor.clearStaging();
-
-    const { errors } = executor.applyApprovedFromTracker();
-
-    if (errors.length) {
-        console.log(chalk.red("\nSome operations reported errors:\n"));
-        for (const e of errors) {
-            console.log(chalk.red(` ⏺ ${e}`));
-        }
-    } else {
-        console.log(chalk.green("\n✔️ Applied.\n"));
-    }
-    executor.clearStaging();
 }

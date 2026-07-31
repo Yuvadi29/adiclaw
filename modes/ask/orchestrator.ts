@@ -118,65 +118,99 @@ export async function runAskMode(): Promise<void> {
         tools,
     });
 
-    activity.start("Thinking...");
-    const allToolCalls: { toolName: string, input: any }[] = [];
+    activityEvents.onStart(msg => activity.update(msg));
+    activityEvents.onFinish(msg => activity.success(msg));
+    activityEvents.onSilentFinish(msg => activity.done(msg));
+    activityEvents.onFail(msg => activity.fail(msg));
 
-    const result = await agent.generate({
-        prompt: question.trim(),
-        onStepFinish: ({ toolCalls, usage }) => {
-            if (usage) {
-                const u = usage as any;
-                sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
+    let messages: any[] = [];
+    let currentInput = question.trim();
+
+    while (true) {
+        activity.start("Thinking...");
+        const allToolCalls: { toolName: string, input: any }[] = [];
+
+        const generateOpts: any = {
+            onStepFinish: ({ toolCalls, usage }: any) => {
+                if (usage) {
+                    const u = usage as any;
+                    sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
+                }
+                for (const tc of toolCalls) {
+                    if (!tc) continue;
+                    sessionTracker.incrementToolCalls();
+                    allToolCalls.push(tc);
+                }
             }
-            for (const tc of toolCalls) {
-                if (!tc) continue;
-                allToolCalls.push(tc);
+        };
+
+        if (messages.length > 0) {
+            generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: currentInput }] }];
+        } else {
+            generateOpts.prompt = currentInput;
+        }
+
+        const result = await agent.generate(generateOpts);
+
+        activity.stop("Ask Finished");
+
+        if (allToolCalls.length > 0) {
+            console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+            for (const tc of allToolCalls) {
+                const preview = JSON.stringify(tc.input).slice(0, 80);
+                console.log(
+                    chalk.green(' ✔️'),
+                    chalk.bold(String(tc.toolName)),
+                    chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
+                );
             }
+            console.log();
         }
-    });
 
-    activity.stop("Ask Finished");
+        const answer = result.text?.trim() || "(no answer)";
+        console.log("\n" + renderTerminalMarkdown(answer) + "\n");
 
-    if (allToolCalls.length > 0) {
-        console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
-        for (const tc of allToolCalls) {
-            const preview = JSON.stringify(tc.input).slice(0, 80);
-            console.log(
-                chalk.green(' ✔️'),
-                chalk.bold(String(tc.toolName)),
-                chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
-            );
+        messages = result.response.messages;
+
+        const nextInput = await text({
+            message: "Continue chatting? (leave empty to exit or save)"
+        });
+
+        if (isCancel(nextInput) || !(nextInput as string).trim()) {
+            break;
         }
-        console.log();
+        currentInput = (nextInput as string).trim();
     }
 
-    const answer = result.text?.trim() || "(no answer)";
-    console.log("\n" + renderTerminalMarkdown(answer) + "\n");
-
     const wantToSave = await confirm({
-        message: "Save this to a markdown file in the current directory ?",
+        message: "Save this conversation to a markdown file in the current directory ?",
         initialValue: false,
     });
-    if(isCancel(wantToSave) || !wantToSave) return;
+    if (isCancel(wantToSave) || !wantToSave) return;
 
-    const filename= await text({
+    const filename = await text({
         message: "Filename",
         initialValue: "ask.md",
         validate: (v) => {
             const s = (v ?? '').trim();
-            if(!s)return "Required";
-            if(s.includes('..') || s.includes('/') || s.includes('\\'))return 'No Paths';
-            if(!s.toLowerCase().endsWith('.md')) return "Must end with a .md";
+            if (!s) return "Required";
+            if (s.includes('..') || s.includes('/') || s.includes('\\')) return 'No Paths';
+            if (!s.toLowerCase().endsWith('.md')) return "Must end with a .md";
         },
     });
 
-    if(isCancel(filename) || !filename?.trim()){
+    if (isCancel(filename) || !(filename as string)?.trim()) {
         return;
     }
 
-    executor.createFile(filename, asMd(question,answer));
+    const fileContent = messages
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => `**${m.role.toUpperCase()}:**\n${m.content.map((c: any) => c.text).join("\n")}\n\n`)
+        .join("\n");
+
+    executor.createFile((filename as string), fileContent);
     const ok = await runApprovalFlow(tracker);
-    if(!ok) return executor.clearStaging();
+    if (!ok) return executor.clearStaging();
 
     executor.applyApprovedFromTracker();
     executor.clearStaging();
