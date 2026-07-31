@@ -144,7 +144,15 @@ export async function runAgentMode() {
                 generateOpts.prompt = currentInput;
             }
 
-            result = await agent.generate(generateOpts);
+            result = await agent.stream(generateOpts);
+
+            for await (const chunk of result.textStream) {
+                if (activity.isBusy) {
+                    activity.stop();
+                }
+                process.stdout.write(chunk);
+            }
+            console.log();
 
             activity.stop("Agent Finished");
 
@@ -166,9 +174,7 @@ export async function runAgentMode() {
             throw err;
         }
 
-        if (result.text?.trim()) console.log(renderTerminalMarkdown(result.text));
-
-        messages = result.response.messages;
+        messages = (await result.response).messages;
 
         // Approval Flow 
         const ok = await runApprovalFlow(tracker);

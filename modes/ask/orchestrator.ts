@@ -158,7 +158,17 @@ export async function runAskMode(): Promise<void> {
             generateOpts.prompt = currentInput;
         }
 
-        const result = await agent.generate(generateOpts);
+        const result = await agent.stream(generateOpts);
+
+        // Consume the text stream and output it directly to stdout
+        for await (const chunk of result.textStream) {
+            if (activity.isBusy) {
+                activity.stop(); // Hides the spinner while streaming text
+            }
+            process.stdout.write(chunk);
+        }
+        
+        console.log(); // Final newline
 
         activity.stop("Ask Finished");
 
@@ -175,10 +185,9 @@ export async function runAskMode(): Promise<void> {
             console.log();
         }
 
-        const answer = result.text?.trim() || "(no answer)";
-        console.log("\n" + renderTerminalMarkdown(answer) + "\n");
-
-        messages = result.response.messages;
+        const responseText = await result.text;
+        const answer = responseText?.trim() || "(no answer)";
+        messages = (await result.response).messages;
 
         const nextInput = await text({
             message: "Continue chatting? (leave empty to exit or save)"

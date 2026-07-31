@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ToolExecutor } from "../agent/tool-executor";
-import { extractJsonMiddleware, generateText, Output, stepCountIs, tool, wrapLanguageModel } from "ai";
+import { extractJsonMiddleware, generateText, Output, stepCountIs, streamText, tool, wrapLanguageModel } from "ai";
 import { defaultAgentConfig } from "../agent/types";
 import { ActionTracker } from "../agent/action-tracker";
 import { getAgentModel } from "../../ai/ai.config";
@@ -106,7 +106,7 @@ export async function generatePlan(goal: string) {
     const tools = { ...readOnlyTools(executor), ...(hasWeb ? createWebTools(tracker) : {}) };
     console.log(chalk.cyan("\n🔍 Researching & drafting a plan…\n"));
 
-    const result = await generateText({
+    const result = await streamText({
         model,
         tools,
         stopWhen: stepCountIs(20),
@@ -116,7 +116,13 @@ export async function generatePlan(goal: string) {
             schema: planSchema
         })
     });
-    const validated = planSchema.parse(result.output);
+
+    for await (const chunk of result.textStream) {
+        process.stdout.write(chalk.cyan(chunk));
+    }
+    
+    const finalOutput = await result.output;
+    const validated = planSchema.parse(finalOutput);
 
     const steps: PlanStep[] = validated.steps.map((s, i) => ({
         id: `step-${i + 1}`,
