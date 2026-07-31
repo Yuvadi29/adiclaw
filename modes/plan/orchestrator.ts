@@ -65,6 +65,12 @@ export async function runPlanMode(): Promise<void> {
     const agent = new ToolLoopAgent({
       model: getAgentModel(),
       stopWhen: stepCountIs(30),
+      instructions: [
+          "You are an autonomous AI agent. YOU MUST USE THE PROVIDED TOOLS natively to perform actions and read files. DO NOT write scripts for the user to run. DO NOT hallucinate file contents.",
+          `Workspace root: ${config.codebasePath}`,
+          "All mutations are staged until approval.",
+          hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
+      ].join("\n"),
       tools
     });
 
@@ -85,6 +91,7 @@ export async function runPlanMode(): Promise<void> {
         }
         for (const tc of toolCalls) {
           if (!tc) continue;
+          sessionTracker.incrementToolCalls();
           allToolCalls.push(tc);
         }
       }

@@ -64,10 +64,16 @@ function getToolMessage(toolName: string, input: any): string {
 
 export async function runAgentMode() {
     console.log(chalk.bold("Running Agent Mode"));
-    activityEvents.onStart(msg => activity.update(msg));
-    activityEvents.onFinish(msg => activity.success(msg));
-    activityEvents.onSilentFinish(msg => activity.done(msg));
-    activityEvents.onFail(msg => activity.fail(msg));
+    activityEvents.clear();
+    activityEvents.onStart(msg => {
+        if (!activity.isBusy) activity.start(msg);
+        else activity.update(msg);
+    });
+    activityEvents.onFinish(msg => activity.update(msg + chalk.green(" ✓")));
+    activityEvents.onSilentFinish(msg => activity.update(msg + chalk.dim(" ✓")));
+    activityEvents.onFail(msg => {
+        activity.update(chalk.red("Failed: " + msg));
+    });
 
 
     const goal = await text({
@@ -88,11 +94,13 @@ export async function runAgentMode() {
         ...createAgentTools(executor),
         ...(hasWeb ? createWebTools(tracker) : {}),
     };
+    
     // Create the tool loop
     const agent = new ToolLoopAgent({
         model: getAgentModel(),
         stopWhen: stepCountIs(40),
         instructions: [
+            "You are an autonomous AI agent. YOU MUST USE THE PROVIDED TOOLS natively to perform actions and read files. DO NOT write scripts for the user to run. DO NOT hallucinate file contents.",
             `Workspace root: ${config.codebasePath}`,
             "All mutations are staged until approval.",
             hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",

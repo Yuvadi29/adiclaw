@@ -110,6 +110,8 @@ export async function runAskMode(): Promise<void> {
         model: getAgentModel(),
         stopWhen: stepCountIs(20),
         instructions: [
+            "You are a helpful AI assistant. You have access to tools that can read the file system. YOU MUST USE THESE TOOLS natively to answer the user's questions.",
+            "DO NOT write scripts to read files. DO NOT hallucinate file contents. ALWAYS use the `read_file` or `search_files` tool first to gather information.",
             `Workspace root: ${config.codebasePath}`,
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."
@@ -118,10 +120,16 @@ export async function runAskMode(): Promise<void> {
         tools,
     });
 
-    activityEvents.onStart(msg => activity.update(msg));
-    activityEvents.onFinish(msg => activity.success(msg));
-    activityEvents.onSilentFinish(msg => activity.done(msg));
-    activityEvents.onFail(msg => activity.fail(msg));
+    activityEvents.clear();
+    activityEvents.onStart(msg => {
+        if (!activity.isBusy) activity.start(msg);
+        else activity.update(msg);
+    });
+    activityEvents.onFinish(msg => activity.update(msg + chalk.green(" ✓")));
+    activityEvents.onSilentFinish(msg => activity.update(msg + chalk.dim(" ✓")));
+    activityEvents.onFail(msg => {
+        activity.update(chalk.red("Failed: " + msg));
+    });
 
     let messages: any[] = [];
     let currentInput = question.trim();
