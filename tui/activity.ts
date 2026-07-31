@@ -35,6 +35,9 @@ export class ActivityRenderer {
     private recent: string[] = [];
     private started = false;
 
+    private provider = "";
+    private model = "";
+
     start(message?: string) {
         if (this.started) return;
 
@@ -69,25 +72,25 @@ export class ActivityRenderer {
 
         this.recent = this.recent.slice(0, 6);
         this.isBusy = false;
-        
+
         if (this.resetTimer) clearTimeout(this.resetTimer);
         this.resetTimer = setTimeout(() => {
             this.current = "Thinking...";
             this.render();
         }, 800);
-        
+
         this.render();
     }
 
     done(message?: string) {
         this.isBusy = false;
-        
+
         if (this.resetTimer) clearTimeout(this.resetTimer);
         this.resetTimer = setTimeout(() => {
             this.current = "Thinking...";
             this.render();
         }, 800);
-        
+
         this.render();
     }
 
@@ -98,7 +101,7 @@ export class ActivityRenderer {
 
         this.recent = this.recent.slice(0, 6);
         this.isBusy = false;
-        
+
         if (this.resetTimer) clearTimeout(this.resetTimer);
         this.resetTimer = setTimeout(() => {
             this.current = "Thinking...";
@@ -130,12 +133,22 @@ export class ActivityRenderer {
         process.stdout.write("\x1B[H");
         process.stdout.write("\x1B[J");
 
-        console.log(chalk.bold.cyan("🤖 AdiClaw Working\n"));
+        const width = process.stdout.columns ?? 80;
 
+        const left = "🤖 AdiClaw";
+        const right = `${this.provider} • ${this.model}`;
+
+        const spaces = Math.max(
+            1,
+            width - left.length - right.length
+        );
+
+        console.log(chalk.bold.cyan(left) + " ".repeat(spaces) + chalk.dim(right));
+        console.log();
+        
         console.log(
             `${chalk.cyan(FRAMES[this.frame])} ${chalk.bold(this.current)}`
         );
-
         console.log();
 
         if (this.recent.length) {
@@ -145,6 +158,15 @@ export class ActivityRenderer {
             for (const item of this.recent) {
                 console.log(item);
             }
+        }
+    }
+
+    setSession(provider: string, model: string) {
+        this.provider = provider;
+        this.model = model;
+
+        if (this.started) {
+            this.render();
         }
     }
 }

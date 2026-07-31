@@ -1,7 +1,11 @@
-import { select, isCancel } from "@clack/prompts";
+import { select, isCancel, spinner } from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
 import { runCliMode } from "../modes/cli";
+import { checkOllama } from "../ai/ollama";
+import { type AIProvider, PROVIDERS } from "../ai/provider";
+import { aiSession } from "../ai/session";
+import { activity } from "./activity";
 
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
@@ -26,7 +30,7 @@ async function printBannerWithShadow(ascii: string) {
     const width = rowWidth + 10;
     for (let col = 0; col < width; col += 2) {
         process.stdout.write(`\x1b[${bannerLines.length}A`);
-        
+
         for (let i = 0; i < bannerLines.length; i++) {
             const line = ("  " + bannerLines[i]).padEnd(rowWidth);
             let coloredLine = "";
@@ -48,7 +52,7 @@ async function printBannerWithShadow(ascii: string) {
         }
         await Bun.sleep(25);
     }
-    
+
     console.log();
 }
 
@@ -64,11 +68,11 @@ async function bootSequence() {
 
     for (const step of steps) {
         let currentFrame = 0;
-        
+
         // Random duration between 300 and 700ms
         const duration = 300 + Math.random() * 400;
         const endTime = Date.now() + duration;
-        
+
         while (Date.now() < endTime) {
             process.stdout.write(
                 `\r${chalk.cyan(frames[currentFrame % frames.length])} ${chalk.gray(step + "...")}`
@@ -85,6 +89,21 @@ async function bootSequence() {
     console.log();
 }
 
+function formatBytes(bytes: number): string {
+    if(bytes < 1024) return `${bytes} B`;
+
+    const units = ["KB", "MB", "GB"];
+    let size = bytes;
+    let unit = -1;
+
+    do {
+        size /= 1024;
+        unit++;
+    } while (size >= 1024 && unit < units.length -1 );
+
+    return `${size.toFixed(1)} ${units[unit]}`;
+}
+
 export async function runWakeUp() {
     let ascii: string
     try {
@@ -98,6 +117,72 @@ export async function runWakeUp() {
         })
     }
     await printBannerWithShadow(ascii);
+
+    const provider = await select<AIProvider>({
+        message: "Choose AI Provider",
+        options: PROVIDERS.map((p) => ({
+
+            value: p.id,
+            label: p.name,
+            hint: p.description,
+        })),
+    });
+
+    if (isCancel(provider)) {
+        console.log(chalk.dim("\nGoodbye"));
+        return;
+    }
+
+    if (provider === "openrouter") {
+        aiSession.set({
+            provider: "openrouter",
+            providerName: "OpenRouter",
+            model: "openrouter/free"
+        });
+        activity.setSession("OpenRouter", "openrouter/free");
+    }
+
+    if (provider === "ollama") {
+        const s = spinner();
+        s.start("Checking Ollama...");
+
+        const status = await checkOllama();
+        if (!status.running) {
+            s.stop("Ollama not detected");
+            console.log();
+            console.log(
+                chalk.red("⚠️ Ollama is not running. Please install and run Ollama (ollama serve) to use local models.")
+            );
+            console.log();
+            return;
+        }
+        s.stop(`Found ${status.models?.length ?? 0} local model(s)`);
+
+        if (!status.models || status.models.length === 0) {
+            console.log(chalk.yellow("⚠️ No local models found. Please pull a model (e.g., ollama run llama3)."));
+            return;
+        }
+
+        const model = await select<string>({
+            message: "Choose Ollama Model",
+            options: status.models.map((m) => ({
+                value: m.name,
+                label: m.name,
+                hint: formatBytes(m.size),
+            })),
+        });
+
+        if (isCancel(model)) {
+            return;
+        }
+
+        aiSession.set({
+            provider: "ollama",
+            providerName: "Ollama",
+            model,
+        });
+        activity.setSession("Ollama", model);
+    }
 
     await bootSequence();
     console.log(chalk.gray(">_"));

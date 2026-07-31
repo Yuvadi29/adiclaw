@@ -11,6 +11,7 @@
         "@openrouter/ai-sdk-provider": "^3.0.0",
         "@types/marked-terminal": "^6.1.1",
         "@types/node": "^26.1.2",
+        "ai-sdk-ollama": "^4.1.0",
         "chalk": "^6.0.0",
         "commander": "^15.0.0",
         "diff": "^9.0.0",
@@ -63,6 +64,8 @@
     "agent-base": ["agent-base@6.0.2", "", { "dependencies": { "debug": "4" } }, "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ=="],
 
     "ai": ["ai@7.0.41", "", { "dependencies": { "@ai-sdk/gateway": "4.0.31", "@ai-sdk/provider": "4.0.4", "@ai-sdk/provider-utils": "5.0.14" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-GvV7uet1dz3wZFAnLd8rS+rSwIh57b8YvbV/gPaSxKsJkj1wGVnlWbu9pqKG3Op68/mglkz0lIkpsJXy2rBX1A=="],
+
+    "ai-sdk-ollama": ["ai-sdk-ollama@4.1.0", "", { "dependencies": { "@ai-sdk/provider": "^4.0.3", "@ai-sdk/provider-utils": "^5.0.11", "jsonrepair": "^3.15.0", "ollama": "^0.6.3" }, "peerDependencies": { "ai": "^7.0.31" } }, "sha512-WBucDWhYVpahhoY5wAsPy4vbEYc34D7xRJOtfpE5VWkD/cRKG4eY1y3pkyP3pCK/Zmp3cHBuiHWu1vHZ81ljEA=="],
 
     "ansi-escapes": ["ansi-escapes@7.3.0", "", { "dependencies": { "environment": "^1.0.0" } }, "sha512-BvU8nYgGQBxcmMuEeUEmNTvrMVjJNSH7RgW24vXexN4Ven6qCvy4TntnvlnwnMLTVlcRQQdbRY8NKnaIoeWDNg=="],
 
@@ -163,6 +166,8 @@
     "is-fullwidth-code-point": ["is-fullwidth-code-point@3.0.0", "", {}, "sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg=="],
 
     "json-schema": ["json-schema@0.4.0", "", {}, "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA=="],
+
+    "jsonrepair": ["jsonrepair@3.15.0", "", { "bin": { "jsonrepair": "bin/cli.js" } }, "sha512-wy8OTjwsJwQRnQJkKnMJJ9vcytRdBPAgIF/Hy6+s1dAj42BHMKiyL8JzEieIl3JY7idt8eyHwBWTO8mh/+mtwA=="],
 
     "marked": ["marked@18.0.7", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-iDVQ5ldaiKXn6b2JroX5kgRfmwgqolW7NpaEzTl1k/2Zh1njIEN9yniyLV/mOvWwtsE8OGgkjsCYvijuPk1dtA=="],
 

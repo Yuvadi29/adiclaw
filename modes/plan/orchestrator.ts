@@ -12,6 +12,8 @@ import { generatePlan } from "./planner.ts";
 import type { PlanStep } from "./types.ts";
 import { createWebTools } from "./web-tools.ts";
 import { printPlan, selectSteps } from "./selection.ts";
+import { activity } from "../../tui/activity.ts";
+import { activityEvents } from "../agent/activity-events.ts";
 
 
 function stepPrompt(goal: string, step: PlanStep): string {
@@ -21,6 +23,10 @@ function stepPrompt(goal: string, step: PlanStep): string {
 
 export async function runPlanMode(): Promise<void> {
   console.log(chalk.bold("\n🧭 Plan Mode\n"));
+  activityEvents.onStart(msg => activity.update(msg));
+  activityEvents.onFinish(msg => activity.success(msg));
+  activityEvents.onSilentFinish(msg => activity.done(msg));
+  activityEvents.onFail(msg => activity.fail(msg));
 
   const goal = await text({ message: "What is your goal?" });
   if (isCancel(goal) || !goal.trim()) return;
@@ -57,9 +63,35 @@ export async function runPlanMode(): Promise<void> {
       tools
     });
 
-    const r = await agent.generate({prompt:stepPrompt(plan.goal , step)})
+    activity.start(`Executing Step: ${step.title}...`);
+    const allToolCalls: { toolName: string, input: any }[] = [];
 
-    if(r.text) return console.log(renderTerminalMarkdown(r.text))
+    const r = await agent.generate({
+      prompt: stepPrompt(plan.goal, step),
+      onStepFinish: ({ toolCalls }) => {
+        for (const tc of toolCalls) {
+          if (!tc) continue;
+          allToolCalls.push(tc);
+        }
+      }
+    });
+
+    activity.stop(`Step Finished: ${step.title}`);
+
+    if (allToolCalls.length > 0) {
+      console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+      for (const tc of allToolCalls) {
+        const preview = JSON.stringify(tc.input).slice(0, 80);
+        console.log(
+          chalk.green(' ✔️'),
+          chalk.bold(String(tc.toolName)),
+          chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
+        );
+      }
+      console.log();
+    }
+
+    if (r.text) console.log(renderTerminalMarkdown(r.text));
 
   }
 

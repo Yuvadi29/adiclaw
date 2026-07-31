@@ -9,6 +9,8 @@ import { defaultAgentConfig } from "../agent/types";
 import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "../agent/approval";
 import { createWebTools } from "../plan/web-tools";
+import { activity } from "../../tui/activity";
+import { activityEvents } from "../agent/activity-events";
 
 function createAskTools(executor: ToolExecutor) {
     return {
@@ -76,8 +78,12 @@ function asMd(question: string, answer: string): string {
     return `# Ask Mode\n\n## Question\n\n${question.trim()}\n\n## Answer\n\n${answer.trim()}\n`;
 };
 
-export async function runAskMode() { 
+export async function runAskMode(): Promise<void> { 
     console.log(chalk.bold("\n❓ Ask Mode\n"));
+    activityEvents.onStart(msg => activity.update(msg));
+    activityEvents.onFinish(msg => activity.success(msg));
+    activityEvents.onSilentFinish(msg => activity.done(msg));
+    activityEvents.onFail(msg => activity.fail(msg));
 
     const question = await text({
         message:"What do you want to ask ?"
@@ -111,9 +117,34 @@ export async function runAskMode() {
         tools,
     });
 
+    activity.start("Thinking...");
+    const allToolCalls: { toolName: string, input: any }[] = [];
+
     const result = await agent.generate({
-        prompt: question.trim()
+        prompt: question.trim(),
+        onStepFinish: ({ toolCalls }) => {
+            for (const tc of toolCalls) {
+                if (!tc) continue;
+                allToolCalls.push(tc);
+            }
+        }
     });
+
+    activity.stop("Ask Finished");
+
+    if (allToolCalls.length > 0) {
+        console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+        for (const tc of allToolCalls) {
+            const preview = JSON.stringify(tc.input).slice(0, 80);
+            console.log(
+                chalk.green(' ✔️'),
+                chalk.bold(String(tc.toolName)),
+                chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
+            );
+        }
+        console.log();
+    }
+
     const answer = result.text?.trim() || "(no answer)";
     console.log("\n" + renderTerminalMarkdown(answer) + "\n");
 
