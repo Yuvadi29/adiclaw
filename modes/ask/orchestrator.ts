@@ -11,6 +11,7 @@ import { runApprovalFlow } from "../agent/approval";
 import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
 import { activityEvents } from "../agent/activity-events";
+import { sessionTracker } from "../../ai/session/session-tracker";
 
 function createAskTools(executor: ToolExecutor) {
     return {
@@ -122,7 +123,11 @@ export async function runAskMode(): Promise<void> {
 
     const result = await agent.generate({
         prompt: question.trim(),
-        onStepFinish: ({ toolCalls }) => {
+        onStepFinish: ({ toolCalls, usage }) => {
+            if (usage) {
+                const u = usage as any;
+                sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
+            }
             for (const tc of toolCalls) {
                 if (!tc) continue;
                 allToolCalls.push(tc);

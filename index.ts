@@ -2,6 +2,9 @@
 
 import { Command } from "commander";
 import { runWakeUp } from "./tui/wakeup";
+import { setupShutdownHandlers, shutdown } from "./ai/session/shutdown";
+
+setupShutdownHandlers();
 
 const program = new Command();
 
@@ -22,8 +25,9 @@ program
     .description("Show the Banner and pick cli or telegram mode")
     .action(
         async () => {
-            runWakeUp();
+            await runWakeUp();
         }
     );
 
 await program.parseAsync(process.argv);
+shutdown("completed", 0);

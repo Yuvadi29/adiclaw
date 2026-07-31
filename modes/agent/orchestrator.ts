@@ -11,6 +11,7 @@ import { runApprovalFlow } from "./approval";
 import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
 import { activityEvents } from "./activity-events";
+import { sessionTracker } from "../../ai/session/session-tracker";
 
 function getToolMessage(toolName: string, input: any): string {
     switch (toolName) {
@@ -110,7 +111,14 @@ export async function runAgentMode() {
 
         result = await agent.generate({
             prompt: goal.trim(),
-            onStepFinish: ({ toolCalls }) => {
+            onStepFinish: ({ toolCalls, usage }) => {
+                if (usage) {
+                    const u = usage as any;
+                    sessionTracker.addTokens(
+                        u.promptTokens ?? u.inputTokens ?? 0,
+                        u.completionTokens ?? u.outputTokens ?? 0,
+                    );
+                }
                 for (const tc of toolCalls) {
                     if (!tc) continue;
                     allToolCalls.push(tc);

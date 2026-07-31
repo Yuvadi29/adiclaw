@@ -5,6 +5,7 @@ import path from "node:path";
 import type { AgentConfig, ActionLog } from "./types";
 import { ActionTracker } from "./action-tracker";
 import { activityEvents } from "./activity-events";
+import { sessionTracker } from "../../ai/session/session-tracker";
 
 // Set of files which the tool executor should support
 const TEXT_EXT = new Set([
@@ -114,6 +115,8 @@ export class ToolExecutor {
             () => {
                 this.assertNotExcluded(rel, "read_file");
 
+                sessionTracker.incrementFilesRead();
+
                 const abs = this.resolveSafe(rel);
 
                 if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
@@ -138,6 +141,7 @@ export class ToolExecutor {
                     status: "executed",
                 });
 
+                sessionTracker.incrementFilesRead();
                 return text;
             }
         );
@@ -153,6 +157,9 @@ export class ToolExecutor {
                 }
 
                 this.assertNotExcluded(rel, "create_file");
+
+                sessionTracker.incrementFilesCreated();
+
 
                 const key = this.norm(rel);
                 const abs = this.resolveSafe(rel);
@@ -183,6 +190,8 @@ export class ToolExecutor {
 
                 this.assertNotExcluded(rel, "modify_file");
 
+                sessionTracker.incrementFilesModified();
+
                 const before = this.getEffectiveText(rel);
                 if (before === undefined) {
                     throw new Error(`modify_file: file not found: ${rel}`);
@@ -208,6 +217,8 @@ export class ToolExecutor {
                     throw new Error("File Deletion Disabled");
                 }
                 this.assertNotExcluded(rel, "delete_file");
+                sessionTracker.incrementFilesDeleted();
+
                 const before = this.getEffectiveText(rel);
                 if (before === undefined) {
                     throw new Error(`delete_file: file not found: ${rel}`);
@@ -397,6 +408,9 @@ export class ToolExecutor {
             () => {
                 if (!this.config.tools.allowShellExecution)
                     throw new Error("Shell execution disabled");
+
+                sessionTracker.incrementShellCommands();
+
                 this.tracker.log({
                     type: "tool_execute",
                     path: "shell",

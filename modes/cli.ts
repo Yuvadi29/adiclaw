@@ -2,6 +2,8 @@ import { isCancel, select } from "@clack/prompts";
 import chalk from "chalk";
 import { runAgentMode } from "./agent/orchestrator";
 import { runAskMode } from "./ask/orchestrator";
+import { runPlanMode } from "./plan/orchestrator";
+import { shutdown } from "../ai/session/shutdown";
 
 export async function runCliMode() {
     while (true) {
@@ -22,12 +24,19 @@ export async function runCliMode() {
                 },
                 {
                     value: "back",
-                    label: "Back to main menu"
+                    label: "Exit"
                 }
             ]
         });
 
-        if(isCancel(mode) || mode === "back") return;
+        if (isCancel(mode)) {
+            shutdown("cancelled", 0);
+            return;
+        }
+
+        if (mode === "back") {
+            return;
+        }
 
         if(mode === "agent"){
             await runAgentMode();
@@ -36,7 +45,7 @@ export async function runCliMode() {
             await runAskMode();
         }
         if(mode === "plan"){
-            console.log("Plan Mode")
+            await runPlanMode();
         }
 
         if (mode !== "agent" && mode !== "plan" && mode !== "ask"){

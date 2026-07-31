@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { confirm, isCancel, text } from "@clack/prompts";
+import { confirm, isCancel, text, spinner } from "@clack/prompts";
 import { ToolLoopAgent, stepCountIs } from "ai";
 import { getAgentModel } from "../../ai/ai.config.ts";
 import { ActionTracker } from "../agent/action-tracker.ts";
@@ -14,6 +14,7 @@ import { createWebTools } from "./web-tools.ts";
 import { printPlan, selectSteps } from "./selection.ts";
 import { activity } from "../../tui/activity.ts";
 import { activityEvents } from "../agent/activity-events.ts";
+import { sessionTracker } from "../../ai/session/session-tracker.ts";
 
 
 function stepPrompt(goal: string, step: PlanStep): string {
@@ -54,21 +55,34 @@ export async function runPlanMode(): Promise<void> {
     ...(hasWeb ? createWebTools(tracker) : {})
   };
 
+  // Temporarily detach activity tracker listeners so they don't corrupt the scrolling history
+  activityEvents.clear();
+
   for (const step of selected) {
-    console.log(chalk.bold(`\n🔧 ${step.title}\n`));
+    const s = spinner();
+    s.start(chalk.bold(`🔧 ${step.title}`));
 
     const agent = new ToolLoopAgent({
-      model:getAgentModel(),
-      stopWhen:stepCountIs(30),
+      model: getAgentModel(),
+      stopWhen: stepCountIs(30),
       tools
     });
 
-    activity.start(`Executing Step: ${step.title}...`);
-    const allToolCalls: { toolName: string, input: any }[] = [];
+    const allToolCalls: any[] = [];
 
     const r = await agent.generate({
       prompt: stepPrompt(plan.goal, step),
-      onStepFinish: ({ toolCalls }) => {
+      onStepFinish: ({ toolCalls, usage }) => {
+        if (usage) {
+            const u = usage as any;
+            sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
+        }
+        if (toolCalls && toolCalls.length > 0) {
+          const latestTc = toolCalls[toolCalls.length - 1];
+          if (latestTc) {
+            s.message(`Using tool: ${latestTc.toolName}`);
+          }
+        }
         for (const tc of toolCalls) {
           if (!tc) continue;
           allToolCalls.push(tc);
@@ -76,7 +90,7 @@ export async function runPlanMode(): Promise<void> {
       }
     });
 
-    activity.stop(`Step Finished: ${step.title}`);
+    s.stop(chalk.bold(`✔ 🔧 ${step.title}`));
 
     if (allToolCalls.length > 0) {
       console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
@@ -91,8 +105,10 @@ export async function runPlanMode(): Promise<void> {
       console.log();
     }
 
-    if (r.text) console.log(renderTerminalMarkdown(r.text));
-
+    if (r.text) {
+        console.log(renderTerminalMarkdown(r.text));
+        console.log();
+    }
   }
 
   const ok = await runApprovalFlow(tracker);

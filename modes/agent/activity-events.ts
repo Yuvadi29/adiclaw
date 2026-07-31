@@ -6,6 +6,13 @@ class ActivityEvents {
     private silentFinishListeners: Listener[] = [];
     private failListeners: Listener[] = [];
 
+    clear() {
+        this.startListeners = [];
+        this.finishListeners = [];
+        this.silentFinishListeners = [];
+        this.failListeners = [];
+    }
+
     onStart(fn: Listener) {
         this.startListeners.push(fn);
     }

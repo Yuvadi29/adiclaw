@@ -6,6 +6,8 @@ import { checkOllama } from "../ai/ollama";
 import { type AIProvider, PROVIDERS } from "../ai/provider";
 import { aiSession } from "../ai/session";
 import { activity } from "./activity";
+import { sessionTracker } from "../ai/session/session-tracker";
+import { shutdown } from "../ai/session/shutdown";
 
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
@@ -130,6 +132,7 @@ export async function runWakeUp() {
 
     if (isCancel(provider)) {
         console.log(chalk.dim("\nGoodbye"));
+        shutdown("cancelled", 0);
         return;
     }
 
@@ -160,6 +163,7 @@ export async function runWakeUp() {
 
         if (!status.models || status.models.length === 0) {
             console.log(chalk.yellow("⚠️ No local models found. Please pull a model (e.g., ollama run llama3)."));
+            shutdown("crashed", 1);
             return;
         }
 
@@ -173,6 +177,7 @@ export async function runWakeUp() {
         });
 
         if (isCancel(model)) {
+            shutdown("cancelled", 0);
             return;
         }
 
@@ -183,6 +188,9 @@ export async function runWakeUp() {
         });
         activity.setSession("Ollama", model);
     }
+
+    const sess = aiSession.get();
+    sessionTracker.start(sess.providerName || sess.provider, sess.model);
 
     await bootSequence();
     console.log(chalk.gray(">_"));
@@ -208,9 +216,16 @@ export async function runWakeUp() {
         ]
     });
 
-    if (isCancel(mode || mode === "exit")) {
+    if (isCancel(mode)) {
         console.log(chalk.dim("\n Goodbye.... \n"));
-        return
+        shutdown("cancelled", 0);
+        return;
+    }
+    
+    if (mode === "exit") {
+        console.log(chalk.dim("\n Goodbye.... \n"));
+        shutdown("completed", 0);
+        return;
     }
 
     if (mode === "cli") {
