@@ -14,7 +14,7 @@ const PROVIDER_NAMES: Record<AIProvider, string> = {
 export function loadConfig(): AdiClawConfig {
     const provider = (process.env.ADICLAW_PROVIDER ?? "ollama") as AIProvider;
     const model = process.env.ADICLAW_MODEL
-        ?? (provider === "ollama" ? "mistral:latest" : "openrouter/free");
+        ?? (provider === "ollama" ? "gemma4:latest" : "openrouter/free");
 
     return {
         provider,

@@ -22,15 +22,19 @@ function stepPrompt(goal: string, step: PlanStep): string {
 }
 
 
-export async function runPlanMode(): Promise<void> {
+export async function runPlanMode(initialGoal?: string): Promise<void> {
   console.log(chalk.bold("\n🧭 Plan Mode\n"));
   activityEvents.onStart(msg => activity.update(msg));
   activityEvents.onFinish(msg => activity.success(msg));
   activityEvents.onSilentFinish(msg => activity.done(msg));
   activityEvents.onFail(msg => activity.fail(msg));
 
-  const goal = await text({ message: "What is your goal?" });
-  if (isCancel(goal) || !goal.trim()) return;
+  let goal = initialGoal;
+  if (!goal) {
+    const input = await text({ message: "What is your goal?" });
+    if (isCancel(input) || !input.trim()) return;
+    goal = input.trim();
+  }
 
   const plan = await generatePlan(goal);
 

@@ -79,17 +79,22 @@ function asMd(question: string, answer: string): string {
     return `# Ask Mode\n\n## Question\n\n${question.trim()}\n\n## Answer\n\n${answer.trim()}\n`;
 };
 
-export async function runAskMode(): Promise<void> { 
+export async function runAskMode(initialQuestion?: string): Promise<void> { 
     console.log(chalk.bold("\n❓ Ask Mode\n"));
     activityEvents.onStart(msg => activity.update(msg));
     activityEvents.onFinish(msg => activity.success(msg));
     activityEvents.onSilentFinish(msg => activity.done(msg));
     activityEvents.onFail(msg => activity.fail(msg));
 
-    const question = await text({
-        message:"What do you want to ask ?"
-    });
-    if(isCancel(question) || !question.trim()) return;
+    let question = initialQuestion;
+    if (!question) {
+        const input = await text({
+            message: "What do you want to ask ?",
+            placeholder: "e.g. How does the router work?",
+        });
+        if (isCancel(input) || !input.trim()) return;
+        question = input.trim();
+    }
     
     const config = defaultAgentConfig();
     config.tools.allowFileCreation = true;
@@ -112,6 +117,7 @@ export async function runAskMode(): Promise<void> {
         instructions: [
             "You are a helpful AI assistant. You have access to tools that can read the file system. YOU MUST USE THESE TOOLS natively to answer the user's questions.",
             "DO NOT write scripts to read files. DO NOT hallucinate file contents. ALWAYS use the `read_file` or `search_files` tool first to gather information.",
+            "CRITICAL: You are in READ-ONLY mode. You CANNOT create, modify, or delete files. If the user asks you to create a file, you MUST inform them to use /agent or /plan mode instead.",
             `Workspace root: ${config.codebasePath}`,
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."

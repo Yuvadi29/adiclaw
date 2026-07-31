@@ -62,7 +62,7 @@ function getToolMessage(toolName: string, input: any): string {
     }
 }
 
-export async function runAgentMode() {
+export async function runAgentMode(initialGoal?: string) {
     console.log(chalk.bold("Running Agent Mode"));
     activityEvents.clear();
     activityEvents.onStart(msg => {
@@ -76,11 +76,15 @@ export async function runAgentMode() {
     });
 
 
-    const goal = await text({
-        message: "What would you want the agent to do ?",
-        placeholder: "Concrete task for this codebase..."
-    });
-    if (isCancel(goal) || !goal.trim()) return;
+    let goal = initialGoal;
+    if (!goal) {
+        const input = await text({
+            message: "What would you want the agent to do ?",
+            placeholder: "Concrete task for this codebase..."
+        });
+        if (isCancel(input) || !input.trim()) return;
+        goal = input.trim();
+    }
 
     const config = defaultAgentConfig();
     // This will be our tracker to track all the actions happening 
