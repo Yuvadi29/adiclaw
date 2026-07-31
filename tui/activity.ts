@@ -29,6 +29,7 @@ export class ActivityRenderer {
     private msgIndex = 0;
 
     private isBusy = false;
+    private resetTimer?: Timer;
 
     private current = "Thinking...";
     private recent: string[] = [];
@@ -50,25 +51,12 @@ export class ActivityRenderer {
 
         this.timer = setInterval(() => {
             this.frame = (this.frame + 1) % FRAMES.length;
-
-            if (!this.isBusy) {
-                if (this.frame % 20 === 0) {
-                    this.msgIndex = (this.msgIndex + 1) % THINKING_MESSAGES.length;
-
-                    if (
-                        this.current === "Thinking..." ||
-                        THINKING_MESSAGES.includes(this.current)
-                    ) {
-                        this.current = THINKING_MESSAGES[this.msgIndex] ?? "Thinking...";
-                    }
-                }
-            }
-
             this.render();
         }, 100);
     }
 
     update(message: string) {
+        if (this.resetTimer) clearTimeout(this.resetTimer);
         this.current = message;
         this.isBusy = true;
         this.render();
@@ -81,7 +69,25 @@ export class ActivityRenderer {
 
         this.recent = this.recent.slice(0, 6);
         this.isBusy = false;
-        this.current = "Thinking...";
+        
+        if (this.resetTimer) clearTimeout(this.resetTimer);
+        this.resetTimer = setTimeout(() => {
+            this.current = "Thinking...";
+            this.render();
+        }, 800);
+        
+        this.render();
+    }
+
+    done(message?: string) {
+        this.isBusy = false;
+        
+        if (this.resetTimer) clearTimeout(this.resetTimer);
+        this.resetTimer = setTimeout(() => {
+            this.current = "Thinking...";
+            this.render();
+        }, 800);
+        
         this.render();
     }
 
@@ -92,7 +98,13 @@ export class ActivityRenderer {
 
         this.recent = this.recent.slice(0, 6);
         this.isBusy = false;
-        this.current = "Thinking...";
+        
+        if (this.resetTimer) clearTimeout(this.resetTimer);
+        this.resetTimer = setTimeout(() => {
+            this.current = "Thinking...";
+            this.render();
+        }, 800);
+
         this.render();
     }
 

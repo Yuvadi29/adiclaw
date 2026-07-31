@@ -3,6 +3,7 @@ type Listener = (message: string) => void;
 class ActivityEvents {
     private startListeners: Listener[] = [];
     private finishListeners: Listener[] = [];
+    private silentFinishListeners: Listener[] = [];
     private failListeners: Listener[] = [];
 
     onStart(fn: Listener) {
@@ -11,6 +12,10 @@ class ActivityEvents {
 
     onFinish(fn: Listener) {
         this.finishListeners.push(fn);
+    }
+
+    onSilentFinish(fn: Listener) {
+        this.silentFinishListeners.push(fn);
     }
 
     onFail(fn: Listener) {
@@ -23,6 +28,10 @@ class ActivityEvents {
 
     finish(msg: string) {
         this.finishListeners.forEach(l => l(msg));
+    }
+
+    silentFinish(msg: string) {
+        this.silentFinishListeners.forEach(l => l(msg));
     }
 
     fail(msg: string) {

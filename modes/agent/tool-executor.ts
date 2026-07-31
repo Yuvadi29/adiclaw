@@ -23,7 +23,8 @@ const TEXT_EXT = new Set([
     '.mdx',
     '.yml',
     '.toml',
-    '.txt'
+    '.txt',
+    '.mermaid'
 ]);
 
 function isProbablyTextFile(filePath: string): boolean {
@@ -45,12 +46,17 @@ export class ToolExecutor {
     private runWithActivity<T>(
         message: string,
         fn: () => T,
+        isSilent: boolean = false
     ): T {
         activityEvents.start(message);
 
         try {
             const result = fn();
-            activityEvents.finish(message);
+            if (isSilent) {
+                activityEvents.silentFinish(message);
+            } else {
+                activityEvents.finish(message);
+            }
             return result;
         } catch (err) {
             activityEvents.fail(message);
@@ -133,7 +139,7 @@ export class ToolExecutor {
                 });
 
                 return text;
-            },
+            }
         );
     }
 
@@ -240,7 +246,7 @@ export class ToolExecutor {
     }
 
     //List Files
-    listFiles(rel: string, recursive: boolean): string {
+    listFiles(rel: string, recursive: boolean = false): string {
         return this.runWithActivity(
             `📂 Listing ${rel}`,
             () => {
@@ -274,7 +280,8 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return out || "(empty)";
-            });
+            }
+        );
     }
 
     // Search files
@@ -340,7 +347,8 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return out || "(no matches)";
-            });
+            }
+        );
     }
 
     //Analyse Codebase
@@ -378,7 +386,8 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return summary;
-            });
+            }
+        );
     }
 
     // QueueShell
@@ -440,7 +449,8 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return out || "(none)";
-            });
+            }
+        );
     }
 
     // Read Skills
@@ -464,7 +474,8 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return text;
-            });
+            }
+        );
     }
 
     applyApprovedFromTracker(): { errors: string[] } {

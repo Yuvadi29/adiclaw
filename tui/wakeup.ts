@@ -14,7 +14,6 @@ const GLOW = [
 
 async function printBannerWithShadow(ascii: string) {
     const bannerLines = ascii.replace(/\s+$/, "").split("\n");
-
     const maxLen = Math.max(...bannerLines.map((l) => l.length), 0);
     const rowWidth = maxLen + 2;
 
@@ -23,27 +22,37 @@ async function printBannerWithShadow(ascii: string) {
         console.log(SHADOW("  " + line).padEnd(rowWidth));
     }
 
-    // Go back to top
-    process.stdout.write(`\x1b[${bannerLines.length}A`);
-
-    // Reveal the foreground line-by-line
-    for (const color of GLOW) {
-
-        process.stdout.write(`\x1b[${bannerLines.length + 1}A`);
-
-        for (const line of bannerLines) {
-            console.log(color("  " + line).padEnd(rowWidth));
+    // Laser scanner effect sweeping left to right
+    const width = rowWidth + 10;
+    for (let col = 0; col < width; col += 2) {
+        process.stdout.write(`\x1b[${bannerLines.length}A`);
+        
+        for (let i = 0; i < bannerLines.length; i++) {
+            const line = ("  " + bannerLines[i]).padEnd(rowWidth);
+            let coloredLine = "";
+            for (let j = 0; j < line.length; j++) {
+                const dist = Math.abs(j - col);
+                if (dist < 2) {
+                    coloredLine += chalk.white.bold(line[j]);
+                } else if (dist < 5) {
+                    coloredLine += chalk.cyanBright(line[j]);
+                } else if (dist < 8) {
+                    coloredLine += chalk.blueBright(line[j]);
+                } else if (j < col) {
+                    coloredLine += PRIMARY(line[j]);
+                } else {
+                    coloredLine += SHADOW(line[j]);
+                }
+            }
+            console.log(coloredLine);
         }
-
-        await Bun.sleep(90);
-
+        await Bun.sleep(25);
     }
-
+    
     console.log();
 }
 
 async function bootSequence() {
-
     const steps = [
         "Initializing runtime",
         "Loading AI models",
@@ -51,16 +60,26 @@ async function bootSequence() {
         "Preparing workspace",
     ];
 
+    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
     for (const step of steps) {
-
-        process.stdout.write(chalk.gray(`○ ${step}...`));
-
-        await Bun.sleep(250);
+        let currentFrame = 0;
+        
+        // Random duration between 300 and 700ms
+        const duration = 300 + Math.random() * 400;
+        const endTime = Date.now() + duration;
+        
+        while (Date.now() < endTime) {
+            process.stdout.write(
+                `\r${chalk.cyan(frames[currentFrame % frames.length])} ${chalk.gray(step + "...")}`
+            );
+            currentFrame++;
+            await Bun.sleep(50);
+        }
 
         process.stdout.write(
-            `\r${chalk.green("✔")} ${step}\n`
+            `\r${chalk.green("✔")} ${chalk.white(step + "...")}\x1b[K\n`
         );
-
     }
 
     console.log();

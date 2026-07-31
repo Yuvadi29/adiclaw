@@ -65,7 +65,8 @@ export async function runAgentMode() {
     console.log(chalk.bold("Running Agent Mode"));
     activityEvents.onStart(msg => activity.update(msg));
     activityEvents.onFinish(msg => activity.success(msg));
-    activityEvents.onFinish(msg => activity.fail(msg));
+    activityEvents.onSilentFinish(msg => activity.done(msg));
+    activityEvents.onFail(msg => activity.fail(msg));
 
 
     const goal = await text({
@@ -105,34 +106,32 @@ export async function runAgentMode() {
         //Loader
         activity.start("Thinking...");
 
+        const allToolCalls: { toolName: string, input: any }[] = [];
+
         result = await agent.generate({
             prompt: goal.trim(),
             onStepFinish: ({ toolCalls }) => {
                 for (const tc of toolCalls) {
                     if (!tc) continue;
-                    activity.update(
-                        getToolMessage(
-                            String(tc.toolName),
-                            tc.input
-                        )
-                    );
-                    activity.success(
-                        getToolMessage(
-                            String(tc.toolName),
-                            tc.input
-                        )
-                    );
-                    // const preview = JSON.stringify(tc.input).slice(0, 160);
-                    // console.log(
-                    //     chalk.green(' ✔️'),
-                    //     chalk.bold(String(tc.toolName)),
-                    //     chalk.dim(preview + (preview.length >= 160 ? "..." : ""))
-                    // )
+                    allToolCalls.push(tc);
                 }
             }
         });
 
         activity.stop("Agent Finished");
+
+        if (allToolCalls.length > 0) {
+            console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+            for (const tc of allToolCalls) {
+                const preview = JSON.stringify(tc.input).slice(0, 80);
+                console.log(
+                    chalk.green(' ✔️'),
+                    chalk.bold(String(tc.toolName)),
+                    chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
+                );
+            }
+            console.log();
+        }
     } catch (err) {
         activity.fail("Agent Failed");
         activity.stop();
