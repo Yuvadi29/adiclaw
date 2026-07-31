@@ -63,7 +63,6 @@ async function bootSequence() {
         "Initializing runtime",
         "Loading AI models",
         "Loading tools",
-        "Preparing workspace",
     ];
 
     const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -193,6 +192,12 @@ export async function runWakeUp() {
     sessionTracker.start(sess.providerName || sess.provider, sess.model);
 
     await bootSequence();
+    
+    // Perform workspace indexing
+    console.log(chalk.gray("Indexing workspace..."));
+    const { scan } = await import("../workspace/scanner");
+    await scan(process.cwd());
+
     console.log(chalk.gray(">_"));
     await Bun.sleep(400);
     process.stdout.write("\x1b[1A");

@@ -6,6 +6,8 @@ import type { AgentConfig, ActionLog } from "./types";
 import { ActionTracker } from "./action-tracker";
 import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
+import { workspace } from "../../workspace";
+import { buildWorkspaceSummary } from "../../workspace/summary";
 
 // Set of files which the tool executor should support
 const TEXT_EXT = new Set([
@@ -99,37 +101,40 @@ export class ToolExecutor {
     };
 
     // Get the effective text of a file.
-    getEffectiveText(rel: string): string | undefined {
+    async getEffectiveText(rel: string): Promise<string | undefined> {
         const key = this.norm(rel);
         if (this.deleted.has(key)) return undefined;
         if (this.overlay.has(key)) return this.overlay.get(key);
         const abs = this.resolveSafe(rel);
-        if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return undefined;
-        return fs.readFileSync(abs, 'utf8');
+        
+        const file = workspace.get(abs);
+        if (!file) return undefined;
+        
+        return await workspace.read(abs);
     };
 
     // Read File
-    readFile(rel: string): string {
+    async readFile(rel: string) {
         return this.runWithActivity(
             `📖 Reading ${rel}`,
-            () => {
+            async () => {
                 this.assertNotExcluded(rel, "read_file");
 
                 sessionTracker.incrementFilesRead();
 
                 const abs = this.resolveSafe(rel);
 
-                if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
-                    throw new Error(`File not found: ${rel}`);
+                const file = workspace.get(abs);
+                if (!file) {
+                    throw new Error(`read_file: not found or not a file: ${rel}`);
                 }
 
-                const st = fs.statSync(abs);
-
-                if (st.size > this.config.maxFileSizeToRead) {
+                if (file.size > 250_000) {
                     throw new Error(`File too large: ${rel}`);
                 }
 
-                const text = fs.readFileSync(abs, "utf8");
+                // const text = fs.readFileSync(abs, "utf8");
+                const text = await workspace.read(abs);
 
                 this.tracker.log({
                     type: "code_analysis",
@@ -168,6 +173,15 @@ export class ToolExecutor {
                 }
                 this.deleted.delete(key);
                 this.overlay.set(key, content);
+
+                workspace.add({
+                    path: abs,
+                    name: path.basename(abs),
+                    extension: path.extname(abs),
+                    size: Buffer.byteLength(content),
+                    modified: Date.now(),
+                });
+                workspace.update(abs, content);
                 this.tracker.log({
                     type: "file_create",
                     path: key,
@@ -180,10 +194,10 @@ export class ToolExecutor {
     }
 
     // Modify File
-    modifyFile(rel: string, content: string): string {
+    async modifyFile(rel: string, content: string): Promise<string> {
         return this.runWithActivity(
             `✏️ Modifying ${rel}`,
-            () => {
+            async () => {
                 if (!this.config.tools.allowFileModification) {
                     throw new Error("File modification disabled");
                 }
@@ -192,12 +206,14 @@ export class ToolExecutor {
 
                 sessionTracker.incrementFilesModified();
 
-                const before = this.getEffectiveText(rel);
+                const before = await this.getEffectiveText(rel);
                 if (before === undefined) {
                     throw new Error(`modify_file: file not found: ${rel}`);
                 }
                 const key = this.norm(rel);
+                const abs = this.resolveSafe(rel);
                 this.overlay.set(key, content);
+                workspace.update(abs, content);
                 this.tracker.log({
                     type: "file_modify",
                     path: key,
@@ -209,23 +225,25 @@ export class ToolExecutor {
     }
 
     // Delete File
-    deleteFile(rel: string): string {
+    async deleteFile(rel: string): Promise<string> {
         return this.runWithActivity(
             `🗑️ Deleting ${rel}`,
-            () => {
+            async () => {
                 if (!this.config.tools.allowFileModification) {
                     throw new Error("File Deletion Disabled");
                 }
                 this.assertNotExcluded(rel, "delete_file");
                 sessionTracker.incrementFilesDeleted();
 
-                const before = this.getEffectiveText(rel);
+                const before = await this.getEffectiveText(rel);
                 if (before === undefined) {
                     throw new Error(`delete_file: file not found: ${rel}`);
                 }
                 const key = this.norm(rel);
+                const abs = this.resolveSafe(rel);
                 this.overlay.delete(key);
                 this.deleted.add(key);
+                workspace.remove(abs);
                 this.tracker.log({
                     type: "file_delete",
                     path: key,
@@ -257,146 +275,272 @@ export class ToolExecutor {
     }
 
     //List Files
-    listFiles(rel: string, recursive: boolean = false): string {
+    // listFiles(rel: string, recursive: boolean = false): string {
+    //     return this.runWithActivity(
+    //         `📂 Listing ${rel}`,
+    //         () => {
+    //             this.assertNotExcluded(rel, "list_files");
+    //             const abs = this.resolveSafe(rel);
+    //             if (!fs.existsSync(abs)) throw new Error(`list_files: not found: ${rel}`);
+
+    //             const lines: string[] = [];
+    //             const walk = (dir: string, prefix: string) => {
+    //                 const entries = fs.readdirSync(dir, { withFileTypes: true });
+    //                 for (const ent of entries) {
+    //                     const full = path.join(dir, ent.name);
+    //                     const relP = path.relative(this.config.codebasePath, full);
+    //                     if (this.excluded(relP)) continue;
+    //                     if (ent.isDirectory()) {
+    //                         lines.push(`${prefix}${ent.name}/`);
+    //                         if (recursive) walk(full, `${prefix}${ent.name}/`);
+    //                     } else {
+    //                         lines.push(`${prefix}${ent.name}`);
+    //                     }
+    //                 }
+    //             };
+    //             if (fs.statSync(abs).isDirectory()) walk(abs, "");
+    //             else lines.push(path.relative(this.config.codebasePath, abs));
+
+    //             const out = lines.sort().join("\n");
+    //             this.tracker.log({
+    //                 type: "code_analysis",
+    //                 path: this.norm(rel),
+    //                 details: { after: out, toolName: "list_files" },
+    //                 status: "executed",
+    //             });
+    //             return out || "(empty)";
+    //         }
+    //     );
+    // }
+    listFiles(rel: string, recursive = false): string {
         return this.runWithActivity(
             `📂 Listing ${rel}`,
             () => {
                 this.assertNotExcluded(rel, "list_files");
-                const abs = this.resolveSafe(rel);
-                if (!fs.existsSync(abs)) throw new Error(`list_files: not found: ${rel}`);
 
-                const lines: string[] = [];
-                const walk = (dir: string, prefix: string) => {
-                    const entries = fs.readdirSync(dir, { withFileTypes: true });
-                    for (const ent of entries) {
-                        const full = path.join(dir, ent.name);
-                        const relP = path.relative(this.config.codebasePath, full);
-                        if (this.excluded(relP)) continue;
-                        if (ent.isDirectory()) {
-                            lines.push(`${prefix}${ent.name}/`);
-                            if (recursive) walk(full, `${prefix}${ent.name}/`);
+                const abs = this.resolveSafe(rel);
+
+                const files = workspace.listUnder(abs);
+
+                let lines: string[];
+                if (recursive) {
+                    lines = files.map(file => path.relative(abs, file.path));
+                } else {
+                    const uniqueEntries = new Set<string>();
+                    for (const file of files) {
+                        const rel = path.relative(abs, file.path);
+                        if (rel === '') continue;
+
+                        const firstSep = rel.indexOf(path.sep);
+                        if (firstSep === -1) {
+                            uniqueEntries.add(rel);
                         } else {
-                            lines.push(`${prefix}${ent.name}`);
+                            const dirName = rel.slice(0, firstSep);
+                            uniqueEntries.add(dirName + '/');
                         }
                     }
-                };
-                if (fs.statSync(abs).isDirectory()) walk(abs, "");
-                else lines.push(path.relative(this.config.codebasePath, abs));
+                    lines = [...uniqueEntries];
+                }
+                
+                lines.sort();
 
-                const out = lines.sort().join("\n");
+                const out = lines.join("\n");
+
                 this.tracker.log({
                     type: "code_analysis",
                     path: this.norm(rel),
-                    details: { after: out, toolName: "list_files" },
+                    details: {
+                        after: out || "(empty)",
+                        toolName: "list_files",
+                    },
                     status: "executed",
                 });
+
                 return out || "(empty)";
             }
         );
     }
 
     // Search files
-    searchFiles(
+    // searchFiles(
+    //     rootRel: string,
+    //     globPattern: string,
+    //     contentQuery?: string,
+    // ): string {
+    //     return this.runWithActivity(
+    //         `🔍 Searching ${rootRel}`,
+    //         () => {
+    //             this.assertNotExcluded(rootRel, "search_files");
+    //             const rootAbs = this.resolveSafe(rootRel);
+    //             if (!fs.existsSync(rootAbs))
+    //                 throw new Error(`search_files: root not found: ${rootRel}`);
+
+    //             const results: string[] = [];
+    //             const regexFromGlob = (g: string): RegExp => {
+    //                 const escaped = g
+    //                     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    //                     .replace(/\*\*/g, "§§")
+    //                     .replace(/\*/g, "[^/\\\\]*")
+    //                     .replace(/§§/g, ".*")
+    //                     .replace(/\?/g, ".");
+    //                 return new RegExp(`^${escaped}$`, "i");
+    //             };
+    //             const nameRe = regexFromGlob(globPattern.replace(/\\/g, "/"));
+
+    //             const walk = (dir: string) => {
+    //                 for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    //                     const full = path.join(dir, ent.name);
+    //                     const relP = path
+    //                         .relative(this.config.codebasePath, full)
+    //                         .split(path.sep)
+    //                         .join("/");
+    //                     if (this.excluded(relP)) continue;
+    //                     if (ent.isDirectory()) walk(full);
+    //                     else if (nameRe.test(relP) || nameRe.test(ent.name)) {
+    //                         if (contentQuery) {
+    //                             if (!isProbablyTextFile(full)) continue;
+    //                             const text = fs.readFileSync(full, "utf8");
+    //                             if (!text.includes(contentQuery)) continue;
+    //                         }
+    //                         results.push(relP);
+    //                     }
+    //                 }
+    //             };
+
+    //             if (fs.statSync(rootAbs).isDirectory()) walk(rootAbs);
+    //             else {
+    //                 const relP = path
+    //                     .relative(this.config.codebasePath, rootAbs)
+    //                     .split(path.sep)
+    //                     .join("/");
+    //                 results.push(relP);
+    //             }
+
+    //             const out = [...new Set(results)].sort().join("\n");
+    //             this.tracker.log({
+    //                 type: "code_analysis",
+    //                 path: this.norm(rootRel),
+    //                 details: { after: out || "(no matches)", toolName: "search_files" },
+    //                 status: "executed",
+    //             });
+    //             return out || "(no matches)";
+    //         }
+    //     );
+    // }
+    async searchFiles(
         rootRel: string,
         globPattern: string,
         contentQuery?: string,
-    ): string {
+    ): Promise<string> {
+
         return this.runWithActivity(
             `🔍 Searching ${rootRel}`,
-            () => {
+            async () => {
+
                 this.assertNotExcluded(rootRel, "search_files");
-                const rootAbs = this.resolveSafe(rootRel);
-                if (!fs.existsSync(rootAbs))
-                    throw new Error(`search_files: root not found: ${rootRel}`);
 
-                const results: string[] = [];
-                const regexFromGlob = (g: string): RegExp => {
-                    const escaped = g
-                        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-                        .replace(/\*\*/g, "§§")
-                        .replace(/\*/g, "[^/\\\\]*")
-                        .replace(/§§/g, ".*")
-                        .replace(/\?/g, ".");
-                    return new RegExp(`^${escaped}$`, "i");
-                };
-                const nameRe = regexFromGlob(globPattern.replace(/\\/g, "/"));
+                const root = this.resolveSafe(rootRel);
 
-                const walk = (dir: string) => {
-                    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-                        const full = path.join(dir, ent.name);
-                        const relP = path
-                            .relative(this.config.codebasePath, full)
-                            .split(path.sep)
-                            .join("/");
-                        if (this.excluded(relP)) continue;
-                        if (ent.isDirectory()) walk(full);
-                        else if (nameRe.test(relP) || nameRe.test(ent.name)) {
-                            if (contentQuery) {
-                                if (!isProbablyTextFile(full)) continue;
-                                const text = fs.readFileSync(full, "utf8");
-                                if (!text.includes(contentQuery)) continue;
-                            }
-                            results.push(relP);
-                        }
-                    }
-                };
+                const matches = await workspace.search(
+                    globPattern,
+                    contentQuery,
+                    root
+                );
 
-                if (fs.statSync(rootAbs).isDirectory()) walk(rootAbs);
-                else {
-                    const relP = path
-                        .relative(this.config.codebasePath, rootAbs)
-                        .split(path.sep)
-                        .join("/");
-                    results.push(relP);
-                }
+                const out = matches
+                    .map(f => path.relative(
+                        this.config.codebasePath,
+                        f.path
+                    ))
+                    .sort()
+                    .join("\n");
 
-                const out = [...new Set(results)].sort().join("\n");
                 this.tracker.log({
                     type: "code_analysis",
                     path: this.norm(rootRel),
-                    details: { after: out || "(no matches)", toolName: "search_files" },
+                    details: {
+                        after: out || "(no matches)",
+                        toolName: "search_files",
+                    },
                     status: "executed",
                 });
+
                 return out || "(no matches)";
+
             }
         );
     }
 
     //Analyse Codebase
+    // analyzeCodebase(rootRel: string): string {
+    //     return this.runWithActivity(
+    //         `📊 Analyzing ${rootRel}`,
+    //         () => {
+    //             const rootAbs = this.resolveSafe(rootRel);
+    //             if (!fs.existsSync(rootAbs))
+    //                 throw new Error(`analyze_codebase: not found: ${rootRel}`);
+
+    //             let files = 0;
+    //             let dirs = 0;
+    //             const walk = (dir: string) => {
+    //                 for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    //                     const full = path.join(dir, ent.name);
+    //                     const relP = path.relative(this.config.codebasePath, full);
+    //                     if (this.excluded(relP)) continue;
+    //                     if (ent.isDirectory()) {
+    //                         dirs++;
+    //                         walk(full);
+    //                     } else {
+    //                         files++;
+    //                     }
+    //                 }
+    //             };
+    //             if (fs.statSync(rootAbs).isDirectory()) walk(rootAbs);
+    //             else files = 1;
+
+    //             const summary = `Files: ${files} | Directories: ${dirs}`;
+    //             this.tracker.log({
+    //                 type: "code_analysis",
+    //                 path: this.norm(rootRel),
+    //                 details: { after: summary, toolName: "analyze_codebase" },
+    //                 status: "executed",
+    //             });
+    //             return summary;
+    //         }
+    //     );
+    // }
+
     analyzeCodebase(rootRel: string): string {
         return this.runWithActivity(
             `📊 Analyzing ${rootRel}`,
             () => {
-                const rootAbs = this.resolveSafe(rootRel);
-                if (!fs.existsSync(rootAbs))
-                    throw new Error(`analyze_codebase: not found: ${rootRel}`);
 
-                let files = 0;
-                let dirs = 0;
-                const walk = (dir: string) => {
-                    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-                        const full = path.join(dir, ent.name);
-                        const relP = path.relative(this.config.codebasePath, full);
-                        if (this.excluded(relP)) continue;
-                        if (ent.isDirectory()) {
-                            dirs++;
-                            walk(full);
-                        } else {
-                            files++;
-                        }
-                    }
-                };
-                if (fs.statSync(rootAbs).isDirectory()) walk(rootAbs);
-                else files = 1;
+                const summary = buildWorkspaceSummary();
 
-                const summary = `Files: ${files} | Directories: ${dirs}`;
+                const output = [
+                    `Files: ${summary.totalFiles}`,
+                    "",
+                    "Extensions:",
+                    ...summary.extensions.map(
+                        ([ext, count]) => `${ext}: ${count}`
+                    ),
+                    "",
+                    "Entry Points:",
+                    ...summary.entryPoints.map(f => f.path)
+                ].join("\n");
+
                 this.tracker.log({
                     type: "code_analysis",
                     path: this.norm(rootRel),
-                    details: { after: summary, toolName: "analyze_codebase" },
+                    details: {
+                        after: output,
+                        toolName: "analyze_codebase",
+                    },
                     status: "executed",
                 });
-                return summary;
+
+                return output;
+
             }
         );
     }
