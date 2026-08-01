@@ -695,6 +695,98 @@ export class ToolExecutor {
         return { errors };
     }
 
+    // --- New Agent Skills ---
+
+    // Run Tests
+    runTests(target: string = ""): string {
+        return this.runWithActivity(
+            `🧪 Running Tests`,
+            () => {
+                sessionTracker.incrementShellCommands();
+                const bunPath = process.env.BUN_PATH || `${homedir()}/.bun/bin/bun`;
+                const cmd = target ? `"${bunPath}" test "${target}"` : `"${bunPath}" test`;
+                const r = spawnSync(cmd, {
+                    shell: true,
+                    cwd: this.config.codebasePath,
+                    encoding: "utf8",
+                    maxBuffer: 16 * 1024 * 1024,
+                });
+                const output = (r.stdout || "") + "\n" + (r.stderr || "");
+                this.tracker.log({
+                    type: "code_analysis",
+                    path: target || "project",
+                    details: { after: output, toolName: "run_tests" },
+                    status: "executed",
+                });
+                return output || "(no output)";
+            }
+        );
+    }
+
+    // Search Obsidian
+    searchObsidian(query: string): string {
+        return this.runWithActivity(
+            `📓 Searching Obsidian`,
+            () => {
+                const vaultPath = process.env.OBSIDIAN_VAULT || "/Users/adityatrivedi/Desktop/Obsidian/Adi's Doom";
+                if (!fs.existsSync(vaultPath)) {
+                    throw new Error(`Obsidian vault not found at: ${vaultPath}`);
+                }
+                // Use grep to search inside the vault
+                const r = spawnSync(`grep -rni "${query.replace(/"/g, '\\"')}" .`, {
+                    shell: true,
+                    cwd: vaultPath,
+                    encoding: "utf8",
+                    maxBuffer: 16 * 1024 * 1024,
+                });
+                
+                const output = r.stdout ? r.stdout.slice(0, 5000) : "(no matches)";
+                
+                this.tracker.log({
+                    type: "code_analysis",
+                    path: "obsidian",
+                    details: { after: output, toolName: "search_obsidian" },
+                    status: "executed",
+                });
+                return output;
+            }
+        );
+    }
+
+    // Read Obsidian Note
+    readObsidian(noteRelPath: string): string {
+        return this.runWithActivity(
+            `📓 Reading Note`,
+            () => {
+                const vaultPath = process.env.OBSIDIAN_VAULT || "/Users/adityatrivedi/Desktop/Obsidian/Adi's Doom";
+                let absPath = path.resolve(vaultPath, noteRelPath);
+                
+                // Allow reading .md implicitly if not specified
+                if (!fs.existsSync(absPath) && fs.existsSync(absPath + ".md")) {
+                    absPath += ".md";
+                }
+
+                if (!fs.existsSync(absPath)) {
+                    throw new Error(`Note not found: ${noteRelPath}`);
+                }
+
+                // Security check to ensure it doesn't escape the vault
+                if (!absPath.startsWith(path.resolve(vaultPath))) {
+                    throw new Error("Cannot access files outside the Obsidian vault.");
+                }
+
+                const content = fs.readFileSync(absPath, "utf8");
+                this.tracker.log({
+                    type: "code_analysis",
+                    path: absPath,
+                    details: { after: content, toolName: "read_obsidian" },
+                    status: "executed",
+                });
+                return content;
+            }
+        );
+    }
+
     // Clear Staging 
     clearStaging(): void {
         this.overlay.clear()

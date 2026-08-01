@@ -72,6 +72,22 @@ function createAskTools(executor: ToolExecutor) {
             }),
             execute: async ({ path: p }) => executor.readSkill(p),
         }),
+
+        obsidian_search: tool({
+            description: "Search for a query in your Obsidian vault.",
+            inputSchema: z.object({
+                query: z.string().describe("Search query"),
+            }),
+            execute: async ({ query }) => executor.searchObsidian(query),
+        }),
+
+        obsidian_read: tool({
+            description: "Read a specific markdown note from your Obsidian vault.",
+            inputSchema: z.object({
+                notePath: z.string().describe("Relative path to the note (e.g., 'Ideas/AdiClaw.md')"),
+            }),
+            execute: async ({ notePath }) => executor.readObsidian(notePath),
+        }),
     };
 }
 
@@ -122,6 +138,9 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."
                 : "Web tools are unavailable.",
+            "CRITICAL RULES FOR OBSIDIAN VAULT:",
+            "1. Whenever you are asked to work on a project, search for notes, or check Obsidian, you MUST use the 'obsidian_search' tool first.",
+            "2. DO NOT use 'search_files' or 'list_files' to look for Obsidian notes. The vault is outside the workspace and ONLY accessible via 'obsidian_search' and 'obsidian_read'.",
         ].join("\n"),
         tools,
     });

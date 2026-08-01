@@ -1,8 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { ToolExecutor } from "./tool-executor";
+import type { TaskTracker } from "./task-tracker";
 
-export function createAgentTools(executor: ToolExecutor) {
+export function createAgentTools(executor: ToolExecutor, taskTracker?: TaskTracker) {
     return {
         read_file: tool({
             description:
@@ -106,6 +107,60 @@ export function createAgentTools(executor: ToolExecutor) {
                 path: z.string(),
             }),
             execute: async ({ path: p }) => executor.readSkill(p),
+        }),
+
+        manage_tasks: tool({
+            description: "Manage a checklist of tasks to track your own progress.",
+            inputSchema: z.object({
+                action: z.enum(["set", "start", "complete", "fail"]),
+                tasks: z.array(z.object({
+                    id: z.string(),
+                    title: z.string(),
+                    status: z.enum(["pending", "running", "completed", "failed"])
+                })).optional().describe("Provide full task list when action is 'set'"),
+                taskId: z.string().optional().describe("Provide taskId when action is start/complete/fail")
+            }),
+            execute: async ({ action, tasks, taskId }) => {
+                if (!taskTracker) return "Task tracker unavailable.";
+                switch (action) {
+                    case "set":
+                        if (tasks) taskTracker.setTasks(tasks);
+                        return "Tasks set.";
+                    case "start":
+                        if (taskId) taskTracker.start(taskId);
+                        return `Task ${taskId} started.`;
+                    case "complete":
+                        if (taskId) taskTracker.complete(taskId);
+                        return `Task ${taskId} completed.`;
+                    case "fail":
+                        if (taskId) taskTracker.fail(taskId);
+                        return `Task ${taskId} failed.`;
+                }
+            }
+        }),
+
+        run_tests: tool({
+            description: "Run 'bun test' on the codebase. Pass an optional file path to test a specific file.",
+            inputSchema: z.object({
+                target: z.string().optional().describe("Optional file path to test"),
+            }),
+            execute: async ({ target }) => executor.runTests(target),
+        }),
+
+        obsidian_search: tool({
+            description: "Search for a query in your Obsidian vault.",
+            inputSchema: z.object({
+                query: z.string().describe("Search query"),
+            }),
+            execute: async ({ query }) => executor.searchObsidian(query),
+        }),
+
+        obsidian_read: tool({
+            description: "Read a specific markdown note from your Obsidian vault.",
+            inputSchema: z.object({
+                notePath: z.string().describe("Relative path to the note (e.g., 'Ideas/AdiClaw.md')"),
+            }),
+            execute: async ({ notePath }) => executor.readObsidian(notePath),
         }),
     };
 }

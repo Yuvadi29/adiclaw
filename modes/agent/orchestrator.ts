@@ -4,6 +4,7 @@ import { defaultAgentConfig } from "./types";
 import { ActionTracker } from "./action-tracker";
 import { ToolExecutor } from "./tool-executor";
 import { createAgentTools } from "./agent-tools";
+import { TaskTracker } from "./task-tracker";
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../../ai/ai.config";
 import { renderTerminalMarkdown } from "../../tui/terminal-md";
@@ -57,6 +58,18 @@ function getToolMessage(toolName: string, input: any): string {
         case "fetch_url":
             return `🔗 Fetching URL`;
 
+        case "manage_tasks":
+            return `📋 Managing Tasks`;
+
+        case "run_tests":
+            return `🧪 Running Tests`;
+
+        case "obsidian_search":
+            return `📓 Searching Obsidian`;
+
+        case "obsidian_read":
+            return `📓 Reading Note`;
+
         default:
             return `⚙️ ${toolName}`;
     }
@@ -92,10 +105,13 @@ export async function runAgentMode(initialGoal?: string) {
     //    This will be our tool executor which takes care of executing the tools
     const executor = new ToolExecutor(tracker, config);
 
+    // Initialize the task tracker
+    const taskTracker = new TaskTracker();
+
     const hasWeb = !!process.env.FIRECRAWL_API_KEY;
     // This is where we will be creating the tools that the agent can use
     const tools = {
-        ...createAgentTools(executor),
+        ...createAgentTools(executor, taskTracker),
         ...(hasWeb ? createWebTools(tracker) : {}),
     };
     
@@ -108,6 +124,9 @@ export async function runAgentMode(initialGoal?: string) {
             `Workspace root: ${config.codebasePath}`,
             "All mutations are staged until approval.",
             hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
+            "CRITICAL RULES FOR OBSIDIAN VAULT:",
+            "1. Whenever you are asked to work on a project, search for notes, or check Obsidian, you MUST use the 'obsidian_search' tool first.",
+            "2. DO NOT use 'search_files' or 'list_files' to look for Obsidian notes. The vault is outside the workspace and ONLY accessible via 'obsidian_search' and 'obsidian_read'.",
         ].join("\n"),
         tools,
     });
