@@ -12,6 +12,7 @@ import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
 import { activityEvents } from "../agent/activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
+import { getAITools } from "../../mcp";
 
 function createAskTools(executor: ToolExecutor) {
     return {
@@ -125,6 +126,7 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     const tools = {
         ...createAskTools(executor),
         ...(hasWeb ? createWebTools(tracker) : {}),
+        ...getAITools(),
     };
 
     const agent = new ToolLoopAgent({

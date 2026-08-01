@@ -13,6 +13,7 @@ import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
 import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
+import { getAITools } from "../../mcp";
 
 function getToolMessage(toolName: string, input: any): string {
     switch (toolName) {
@@ -113,6 +114,7 @@ export async function runAgentMode(initialGoal?: string) {
     const tools = {
         ...createAgentTools(executor, taskTracker),
         ...(hasWeb ? createWebTools(tracker) : {}),
+        ...getAITools(),
     };
     
     // Create the tool loop

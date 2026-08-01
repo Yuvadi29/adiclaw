@@ -100,6 +100,10 @@ export async function runWakeUp() {
 
     await bootSequence();
 
+    console.log(chalk.gray("Initializing MCP servers..."));
+    const { initMCP } = await import("../mcp");
+    await initMCP();
+
     // Workspace indexing
     console.log(chalk.gray("Indexing workspace..."));
     const { scan } = await import("../workspace/scanner");

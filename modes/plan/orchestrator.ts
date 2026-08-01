@@ -15,6 +15,7 @@ import { printPlan, selectSteps } from "./selection.ts";
 import { activity } from "../../tui/activity.ts";
 import { activityEvents } from "../agent/activity-events.ts";
 import { sessionTracker } from "../../ai/session/session-tracker.ts";
+import { getAITools } from "../../mcp/index.ts";
 
 
 function stepPrompt(goal: string, step: PlanStep): string {
@@ -56,7 +57,8 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
   const hasWeb = !!process.env.FIRECRAWL_API_KEY;
   const tools = {
     ...createAgentTools(executor),
-    ...(hasWeb ? createWebTools(tracker) : {})
+    ...(hasWeb ? createWebTools(tracker) : {}),
+    ...getAITools(),
   };
 
   // Temporarily detach activity tracker listeners so they don't corrupt the scrolling history
