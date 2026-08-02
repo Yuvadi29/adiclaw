@@ -25,6 +25,19 @@
 
 ---
 
+## 🆕 Recent Updates
+
+- **GitHub MCP Server Integration:** Seamless connection and interaction with GitHub repositories.
+- **Task Tracker & Obsidian Knowledge Base:** Built-in task tracking and knowledge base support using Obsidian, along with a test skill for generating project test cases.
+- **Slash Commands Structure:** Revamped Terminal UI driven by intuitive slash commands (`/help`, `/model`, `/agent`, `/ask`, `/plan`, `/status`, `/clear`, `/exit`).
+- **File & Folder Indexing:** Enhanced local search capabilities with comprehensive workspace indexing.
+- **Continuous Chat & Tools in Ask Mode:** Ask mode now supports a continuous chat loop and tool execution.
+- **Streaming Responses:** Real-time streaming output available across all modes for better UX.
+- **Session Reports & Activity Tracking:** Detailed end-of-session reports and activity tracking for every mode.
+- **UI & Performance Enhancements:** Added UI dropdowns and patched memory leaks for a smoother experience.
+
+---
+
 ## 🔄 Core Architecture & Workflow
 
 ```
