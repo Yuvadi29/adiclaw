@@ -183,9 +183,3 @@ adiclaw/
 - **CLI Framework:** [Commander.js](https://github.com/tj/commander.js)
 - **Terminal UI & Styling:** [`@clack/prompts`](https://github.com/natemoo-re/clack), [`chalk`](https://github.com/chalk/chalk), [`figlet`](https://github.com/patorjk/figlet.js), [`marked-terminal`](https://github.com/mscdex/marked-terminal)
 - **Diff Generation:** [`diff`](https://github.com/kpdecker/jsdiff)
-
----
-
-## 📄 License
-
-MIT © [AdiClaw](https://github.com/Yuvadi29/adiclaw)
