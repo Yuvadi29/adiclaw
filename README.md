@@ -2,6 +2,10 @@
 
 > **An autonomous, sandboxed AI CLI coding assistant & planning engine built with Bun, TypeScript, Vercel AI SDK, OpenRouter, and Firecrawl.**
 
+## 🎥 Demo
+
+[**Watch the Demo Video**](https://drive.google.com/file/d/1P1w1UCxnW7Mps57vz0ouIwCYRRKfoUTt/view?usp=sharing)
+
 ---
 
 ## 🌟 Overview

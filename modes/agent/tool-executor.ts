@@ -30,10 +30,6 @@ const TEXT_EXT = new Set([
     '.mermaid'
 ]);
 
-function isProbablyTextFile(filePath: string): boolean {
-    const ext = path.extname(filePath).toLowerCase();
-    return TEXT_EXT.has(ext) || ext === '';
-};
 
 export class ToolExecutor {
     private overlay = new Map<string, string>();
@@ -79,18 +75,44 @@ export class ToolExecutor {
 
     // Exclude some files when executing the tool. Acting like a security layer   
     private excluded(relPath: string): boolean {
-        const norm = this.norm(relPath);
-        const segments = norm.split('/');
-        const base = segments[segments.length - 1] ?? '';
+        // const norm = this.norm(relPath);
+        // const segments = norm.split('/');
+        // const base = segments[segments.length - 1] ?? '';
 
-        for (const pat of this.config.excludePatterns) {
-            if (pat === "*.log" && base.endsWith(".log")) return true;
-            if (pat === ".env" && base.startsWith(".env")) return true;
-            if (pat.includes("*")) continue;
-            if (segments.includes(pat) || norm === pat || norm.startsWith(`${pat}/`))
-                return true;
+        // for (const pat of this.config.excludePatterns) {
+        //     if (pat === "*.log" && base.endsWith(".log")) return true;
+        //     if (pat === ".env" && base.startsWith(".env")) return true;
+        //     if (pat.includes("*")) continue;
+        //     if (segments.includes(pat) || norm === pat || norm.startsWith(`${pat}/`))
+        //         return true;
+        // }
+        // return false;
+        const normalized = relPath.replace(/\\/g, "/");
+        
+        // Allow selected git metadata
+        if(normalized.startsWith(".git/")){
+            const allowed = [
+                ".git/config",
+                ".git/HEAD",
+                ".git/FETCH_HEAD",
+                ".git/ORIG_HEAD",
+            ];
+            return !allowed.some(file => normalized === file);
         }
-        return false;
+
+        return this.config.excludePatterns.some(pattern => {
+            if(pattern.includes("*")){
+                const regex = new RegExp(
+                    "^" + 
+                    pattern
+                    .replace(/\./g, "\\.")
+                    .replace(/\*\*/g, ".*")
+                    .replace(/\*/g, "[^/]*") + "$"
+                );
+                return regex.test(normalized)
+            }
+            return normalized.startsWith(pattern);
+        })
     };
 
     // Make sure the file is not excluded

@@ -2,7 +2,6 @@ import path from "path";
 import { workspace } from "./index";
 
 const IGNORED = new Set([
-    ".git",
     "node_modules",
     ".next",
     "dist",

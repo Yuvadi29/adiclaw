@@ -1,5 +1,23 @@
 import path from "path";
 import { workspace } from "./index";
+import fs from "fs";
+
+
+
+function getGitRemote(root: string) {
+
+    const config = path.join(root, ".git", "config");
+
+    if (!fs.existsSync(config))
+        return null;
+
+    const text = fs.readFileSync(config, "utf8");
+
+    const match = text.match(/url\s*=\s*(.+)/);
+
+    return match?.[1] ?? null;
+
+}
 
 
 export function buildWorkspaceSummary() {
@@ -37,6 +55,7 @@ export function buildWorkspaceSummary() {
         extensions,
         largestFiles,
         entryPoints,
+        gitRemote: getGitRemote(process.cwd()),
     };
 
 }

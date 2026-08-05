@@ -16,6 +16,7 @@ import { activity } from "../../tui/activity.ts";
 import { activityEvents } from "../agent/activity-events.ts";
 import { sessionTracker } from "../../ai/session/session-tracker.ts";
 import { getAITools } from "../../mcp/index.ts";
+import { buildWorkspaceSummary } from "../../workspace/summary.ts";
 
 
 function stepPrompt(goal: string, step: PlanStep): string {
@@ -50,6 +51,8 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
   });
 
   const config = defaultAgentConfig();
+  const summary = buildWorkspaceSummary();
+  const gitRemoteText = summary.gitRemote ? `Connected to GitHub repository: ${summary.gitRemote}` : "";
   const tracker = new ActionTracker();
   const executor = new ToolExecutor(tracker, config);
 
@@ -74,6 +77,7 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
       instructions: [
           "You are an autonomous AI agent. YOU MUST USE THE PROVIDED TOOLS natively to perform actions and read files. DO NOT write scripts for the user to run. DO NOT hallucinate file contents.",
           `Workspace root: ${config.codebasePath}`,
+          gitRemoteText,
           "All mutations are staged until approval.",
           hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
       ].join("\n"),

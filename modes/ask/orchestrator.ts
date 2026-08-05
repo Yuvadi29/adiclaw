@@ -13,7 +13,7 @@ import { activity } from "../../tui/activity";
 import { activityEvents } from "../agent/activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
-
+import { buildWorkspaceSummary } from "../../workspace/summary";
 function createAskTools(executor: ToolExecutor) {
     return {
         read_file: tool({
@@ -114,6 +114,8 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     }
     
     const config = defaultAgentConfig();
+    const summary = buildWorkspaceSummary();
+    const gitRemoteText = summary.gitRemote ? `Connected to GitHub repository: ${summary.gitRemote}` : "";
     config.tools.allowFileCreation = true;
     config.tools.allowFileModification = false;
     config.tools.allowFolderCreation = false;
@@ -137,6 +139,7 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
             "DO NOT write scripts to read files. DO NOT hallucinate file contents. ALWAYS use the `read_file` or `search_files` tool first to gather information.",
             "CRITICAL: You are in READ-ONLY mode. You CANNOT create, modify, or delete files. If the user asks you to create a file, you MUST inform them to use /agent or /plan mode instead.",
             `Workspace root: ${config.codebasePath}`,
+            gitRemoteText,
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."
                 : "Web tools are unavailable.",

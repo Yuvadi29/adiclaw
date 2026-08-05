@@ -42,7 +42,6 @@ export const defaultAgentConfig = (): AgentConfig => ({
     maxFileSizeToRead: 1024 * 1024,
     excludePatterns: [
         'node_modules',
-        '.git',
         'dist',
         '.env',
         '.next',

@@ -14,6 +14,7 @@ import { activity } from "../../tui/activity";
 import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
+import { buildWorkspaceSummary } from "../../workspace/summary";
 
 function getToolMessage(toolName: string, input: any): string {
     switch (toolName) {
@@ -101,6 +102,8 @@ export async function runAgentMode(initialGoal?: string) {
     }
 
     const config = defaultAgentConfig();
+    const summary = buildWorkspaceSummary();
+    const gitRemoteText = summary.gitRemote ? `Connected to GitHub repository: ${summary.gitRemote}` : "";
     // This will be our tracker to track all the actions happening 
     const tracker = new ActionTracker();
     //    This will be our tool executor which takes care of executing the tools
@@ -124,6 +127,7 @@ export async function runAgentMode(initialGoal?: string) {
         instructions: [
             "You are an autonomous AI agent. YOU MUST USE THE PROVIDED TOOLS natively to perform actions and read files. DO NOT write scripts for the user to run. DO NOT hallucinate file contents.",
             `Workspace root: ${config.codebasePath}`,
+            gitRemoteText,
             "All mutations are staged until approval.",
             hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
             "CRITICAL RULES FOR OBSIDIAN VAULT:",
