@@ -1,5 +1,5 @@
-import { buildMemoryPrompt } from "../memory/prompt";
 import { buildWorkspaceSummary } from "../workspace/summary";
+import { retrieveMemoryContext } from "./retrivers/engine";
 
 interface BuildPromptOptions {
   mode: "ask" | "plan" | "agent";
@@ -9,16 +9,27 @@ interface BuildPromptOptions {
 }
 
 export function buildSystemPrompt(options: BuildPromptOptions): string {
-  const memory = buildMemoryPrompt(options.userPrompt);
-
   const workspace = buildWorkspaceSummary();
-
+  const memoryContext = retrieveMemoryContext(options.userPrompt);
   const sections: string[] = [];
-
-  // User memory
-  if (memory.trim()) {
-    sections.push(memory);
+  
+  if (memoryContext) {
+    sections.push(
+      [
+        `## ${memoryContext.title}`,
+        "",
+        ...memoryContext.content.map((x) => `• ${x}`),
+      ].join("\n"),
+    );
   }
+
+  sections.push(
+    "## Long-Term Memory & Personalization\n" +
+    "You are a highly personalized AI. You have access to a persistent long-term memory system via the `search_memory` and `save_memory` tools, and relevant memory may be injected above.\n" +
+    "- **Acknowledge Preferences:** When you start a task, ALWAYS acknowledge the user's known preferences if they apply to the task (e.g., 'Since I know you prefer Bun and use it in your projects...').\n" +
+    "- **Actively Search:** Use `search_memory(query)` actively to recall user preferences, rules, or past workflows when you encounter a new technology or task.\n" +
+    "- **Proactively Save:** Use `save_memory(text)` proactively to store new important facts, habits, stack choices, or rules you observe the user making. You must know EVERYTHING about what the user is doing."
+  );
 
   // Workspace
   sections.push(

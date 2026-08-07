@@ -89,6 +89,14 @@ function createAskTools(executor: ToolExecutor) {
             }),
             execute: async ({ notePath }) => executor.readObsidian(notePath),
         }),
+
+        search_memory: tool({
+            description: "Search your long-term memory for facts, rules, or preferences about the user.",
+            inputSchema: z.object({
+                query: z.string().describe("Keywords to search for in memory"),
+            }),
+            execute: async ({ query }) => executor.searchMemory(query),
+        }),
     };
 }
 
@@ -189,18 +197,6 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         }
 
         const result = await agent.stream(generateOpts);
-
-        // Consume the text stream and output it directly to stdout
-        for await (const chunk of result.textStream) {
-            if (activity.isBusy) {
-                activity.stop(); // Hides the spinner while streaming text
-            }
-            process.stdout.write(chunk);
-        }
-        
-        console.log(); // Final newline
-
-        activity.stop("Ask Finished");
 
         if (allToolCalls.length > 0) {
             console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));

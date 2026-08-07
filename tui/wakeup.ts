@@ -113,17 +113,31 @@ export async function runWakeUp() {
   //Initializing Memory
   console.log(chalk.grey("Loading Memory...."));
   memory.initialize();
+  console.log(memory.all());
 
   memory.remember({
-      type: "preference",
-      text: "User prefers Bun over npm.",
-      tags: ["bun", "package-manager"],
-      source: "user",
+    type: "workflow",
+
+    text: "Always use Bun instead of npm.",
+
+    tags: ["bun", "package", "runtime"],
+
+    source: "user",
   });
-  
+
+  memory.remember({
+    type: "workflow",
+
+    text: "Prefer TypeScript.",
+
+    tags: ["typescript"],
+
+    source: "user",
+  });
+
   console.log(memory.stats());
-  
-  console.log(memory.search("bun"));   
+
+  console.log(memory.search("bun"));
 
   // Show active config
   console.log(

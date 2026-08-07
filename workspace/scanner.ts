@@ -19,7 +19,14 @@ export async function scan(dir: string) {
     async function walk(current: string) {
         for await (const entry of new Bun.Glob("*").scan({ cwd: current, onlyFiles: false })) {
             const absolute = path.join(current, entry);
-            const stat = await Bun.file(absolute).stat();
+            
+            let stat;
+            try {
+                stat = await Bun.file(absolute).stat();
+            } catch (error) {
+                // Silently skip files that throw ELOOP (symlink loops), EACCES, ENOENT, etc.
+                continue;
+            }
 
             if (stat.isDirectory()) {
                 if (IGNORED.has(path.basename(absolute)))

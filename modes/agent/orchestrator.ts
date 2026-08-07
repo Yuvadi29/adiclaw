@@ -7,6 +7,7 @@ import { createAgentTools } from "./agent-tools";
 import { TaskTracker } from "./task-tracker";
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../../ai/ai.config";
+import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "./approval";
 import { createWebTools } from "../plan/web-tools";
 import { activity } from "../../tui/activity";
@@ -169,15 +170,15 @@ export async function runAgentMode(initialGoal?: string) {
 
             result = await agent.stream(generateOpts);
 
-            for await (const chunk of result.textStream) {
-                if (activity.isBusy) {
-                    activity.stop();
-                }
-                process.stdout.write(chunk);
+            const responseText = await result.text;
+            
+            if (activity.isBusy) {
+                activity.stop("Agent Finished");
             }
-            console.log();
 
-            activity.stop("Agent Finished");
+            if (responseText) {
+                console.log(renderTerminalMarkdown(responseText));
+            }
 
             if (allToolCalls.length > 0) {
                 console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));

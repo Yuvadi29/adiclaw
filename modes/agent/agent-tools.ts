@@ -162,5 +162,21 @@ export function createAgentTools(executor: ToolExecutor, taskTracker?: TaskTrack
             }),
             execute: async ({ notePath }) => executor.readObsidian(notePath),
         }),
+
+        search_memory: tool({
+            description: "Search your long-term memory for facts, rules, or preferences about the user.",
+            inputSchema: z.object({
+                query: z.string().describe("Keywords to search for in memory (e.g. 'bun', 'deployment preferences')"),
+            }),
+            execute: async ({ query }) => executor.searchMemory(query),
+        }),
+
+        save_memory: tool({
+            description: "Save a new fact, rule, or preference to your long-term memory.",
+            inputSchema: z.object({
+                text: z.string().describe("The fact to remember (e.g. 'User prefers Bun over npm')"),
+            }),
+            execute: async ({ text }) => executor.saveMemory(text),
+        }),
     };
 }

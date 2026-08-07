@@ -124,41 +124,81 @@ export class MemoryManager {
   }
 
   /**
-   * Search memories.
+   * Internal tokenizer: lowercases, strips punctuation, and removes common stopwords.
+   */
+  private tokenize(text: string): string[] {
+    const stopWords = new Set([
+      "a", "an", "the", "and", "or", "but", "is", "are", "was", "were", 
+      "in", "on", "at", "to", "for", "of", "with", "by", "this", "that", 
+      "it", "i", "you", "he", "she", "we", "they", "my", "your", "do", 
+      "does", "did", "have", "has", "had", "what", "where", "when", 
+      "why", "how", "can", "could", "would", "should"
+    ]);
+    return text.toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .split(/\s+/)
+      .filter(w => w.length > 0 && !stopWords.has(w));
+  }
+
+  /**
+   * Search memories using BM25 semantic ranking.
    */
   search(query: string): Memory[] {
-    const q = query.toLowerCase();
+    const queryTokens = this.tokenize(query);
+    if (queryTokens.length === 0) return [];
 
-    const ranked = this.db.memories
-      .map((memory) => {
-        let score = 0;
+    const memories = this.db.memories;
+    const N = memories.length;
+    if (N === 0) return [];
 
-        if (memory.text.toLowerCase().includes(q)) {
-          score += 5;
-        }
+    // Precompute tokenized memories and average document length (avgdl)
+    const tokenizedMemories = memories.map(m => {
+      // Combine text and tags to form the document
+      const doc = this.tokenize(m.text).concat(m.tags.flatMap(t => this.tokenize(t)));
+      return { memory: m, tokens: doc, length: doc.length };
+    });
 
-        for (const tag of memory.tags) {
-          if (tag.toLowerCase().includes(q)) {
-            score += 2;
-          }
-        }
+    const avgdl = tokenizedMemories.reduce((sum, m) => sum + m.length, 0) / N;
 
-        score += memory.confidence;
+    // Calculate document frequency for each query term
+    const df = new Map<string, number>();
+    for (const q of queryTokens) {
+      let count = 0;
+      for (const m of tokenizedMemories) {
+        if (m.tokens.includes(q)) count++;
+      }
+      df.set(q, count);
+    }
 
-        return {
-          memory,
-          score,
-        };
-      })
-      .filter((m) => m.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
+    // BM25 parameters
+    const k1 = 1.5;
+    const b = 0.75;
+
+    const ranked = tokenizedMemories.map(m => {
+      let score = m.memory.confidence; // Baseline score based on confidence
+
+      for (const q of queryTokens) {
+        // Calculate Term Frequency (f) of q in this memory
+        const f = m.tokens.filter(t => t === q).length;
+        if (f === 0) continue;
+
+        // Calculate IDF for q
+        const docFreq = df.get(q) || 0;
+        const idf = Math.log((N - docFreq + 0.5) / (docFreq + 0.5) + 1);
+
+        // BM25 Term Score
+        const termScore = idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * (m.length / (avgdl || 1))));
+        score += termScore;
+      }
+
+      return { score, memory: m.memory };
+    })
+    .filter(x => x.score > 1.2) // Threshold
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8);
 
     const now = new Date().toISOString();
-
-    for (const item of ranked) {
-      item.memory.lastAccessedAt = now;
-    }
+    ranked.forEach((r) => (r.memory.lastAccessedAt = now));
 
     this.save();
 

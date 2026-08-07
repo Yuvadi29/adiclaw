@@ -8,6 +8,7 @@ import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { workspace } from "../../workspace";
 import { buildWorkspaceSummary } from "../../workspace/summary";
+import { memory } from "../../memory";
 
 // Set of files which the tool executor should support
 const TEXT_EXT = new Set([
@@ -88,9 +89,9 @@ export class ToolExecutor {
         // }
         // return false;
         const normalized = relPath.replace(/\\/g, "/");
-        
+
         // Allow selected git metadata
-        if(normalized.startsWith(".git/")){
+        if (normalized.startsWith(".git/")) {
             const allowed = [
                 ".git/config",
                 ".git/HEAD",
@@ -101,13 +102,13 @@ export class ToolExecutor {
         }
 
         return this.config.excludePatterns.some(pattern => {
-            if(pattern.includes("*")){
+            if (pattern.includes("*")) {
                 const regex = new RegExp(
-                    "^" + 
+                    "^" +
                     pattern
-                    .replace(/\./g, "\\.")
-                    .replace(/\*\*/g, ".*")
-                    .replace(/\*/g, "[^/]*") + "$"
+                        .replace(/\./g, "\\.")
+                        .replace(/\*\*/g, ".*")
+                        .replace(/\*/g, "[^/]*") + "$"
                 );
                 return regex.test(normalized)
             }
@@ -128,10 +129,10 @@ export class ToolExecutor {
         if (this.deleted.has(key)) return undefined;
         if (this.overlay.has(key)) return this.overlay.get(key);
         const abs = this.resolveSafe(rel);
-        
+
         const file = workspace.get(abs);
         if (!file) return undefined;
-        
+
         return await workspace.read(abs);
     };
 
@@ -363,7 +364,7 @@ export class ToolExecutor {
                     }
                     lines = [...uniqueEntries];
                 }
-                
+
                 lines.sort();
 
                 const out = lines.join("\n");
@@ -761,9 +762,9 @@ export class ToolExecutor {
                     encoding: "utf8",
                     maxBuffer: 16 * 1024 * 1024,
                 });
-                
+
                 const output = r.stdout ? r.stdout.slice(0, 5000) : "(no matches)";
-                
+
                 this.tracker.log({
                     type: "code_analysis",
                     path: "obsidian",
@@ -782,7 +783,7 @@ export class ToolExecutor {
             () => {
                 const vaultPath = process.env.OBSIDIAN_VAULT || "/Users/adityatrivedi/Desktop/Obsidian/Adi's Doom";
                 let absPath = path.resolve(vaultPath, noteRelPath);
-                
+
                 // Allow reading .md implicitly if not specified
                 if (!fs.existsSync(absPath) && fs.existsSync(absPath + ".md")) {
                     absPath += ".md";
@@ -805,6 +806,46 @@ export class ToolExecutor {
                     status: "executed",
                 });
                 return content;
+            }
+        );
+    }
+
+    // Search Memory
+    searchMemory(query: string): string {
+        return this.runWithActivity(
+            `🧠 Searching Memory`,
+            () => {
+                const results = memory.search(query);
+                if (results.length === 0) return "(no matching memories found)";
+                
+                const out = results.map(m => `• ${m.text}`).join("\n");
+                this.tracker.log({
+                    type: "tool_execute",
+                    path: "memory",
+                    details: { after: out, toolName: "search_memory" },
+                    status: "executed",
+                });
+                return out;
+            }
+        );
+    }
+
+    // Save Memory
+    saveMemory(text: string): string {
+        return this.runWithActivity(
+            `🧠 Saving Memory`,
+            () => {
+                memory.remember({
+                    type: "preference",
+                    text
+                });
+                this.tracker.log({
+                    type: "tool_execute",
+                    path: "memory",
+                    details: { after: `Saved: ${text}`, toolName: "save_memory" },
+                    status: "executed",
+                });
+                return `Memory saved: ${text}`;
             }
         );
     }

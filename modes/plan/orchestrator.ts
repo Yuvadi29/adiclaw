@@ -17,6 +17,7 @@ import { activityEvents } from "../agent/activity-events.ts";
 import { sessionTracker } from "../../ai/session/session-tracker.ts";
 import { getAITools } from "../../mcp/index.ts";
 import { buildWorkspaceSummary } from "../../workspace/summary.ts";
+import { buildSystemPrompt } from "../../context/prompt-builder.ts";
 
 
 function stepPrompt(goal: string, step: PlanStep): string {
@@ -74,13 +75,12 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
     const agent = new ToolLoopAgent({
       model: getAgentModel(),
       stopWhen: stepCountIs(30),
-      instructions: [
-          "You are an autonomous AI agent. YOU MUST USE THE PROVIDED TOOLS natively to perform actions and read files. DO NOT write scripts for the user to run. DO NOT hallucinate file contents.",
-          `Workspace root: ${config.codebasePath}`,
-          gitRemoteText,
-          "All mutations are staged until approval.",
-          hasWeb ? "Web tools are available (web_search, web_crawl, fetch_url)." : "Web tools are unavailable.",
-      ].join("\n"),
+      instructions: buildSystemPrompt({
+          mode: "plan",
+          userPrompt: plan.goal,
+          workspaceRoot: config.codebasePath,
+          hasWeb
+      }) + "\nAll mutations are staged until approval.",
       tools
     });
 
