@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import readline from "readline";
 
 export type TaskStatus =
     | "pending"
@@ -14,18 +15,18 @@ export interface Task {
 
 export class TaskTracker {
     private tasks: Task[] = [];
+    private lastRenderedLines: number = 0;
 
     setTasks(tasks: Task[]) {
         this.tasks = tasks;
-        console.log(chalk.bold.cyan("\n📋 Agent Tasks Planned:"));
-        this.list();
+        this.render();
     }
 
     start(id: string) {
         const task = this.tasks.find(t => t.id === id);
         if (task) {
             task.status = "running";
-            console.log(chalk.yellow(`\n⏳ Started Task: `) + task.title);
+            this.render();
         }
     }
 
@@ -33,7 +34,7 @@ export class TaskTracker {
         const task = this.tasks.find(t => t.id === id);
         if (task) {
             task.status = "completed";
-            console.log(chalk.green(`\n✅ Completed Task: `) + task.title);
+            this.render();
         }
     }
 
@@ -41,11 +42,31 @@ export class TaskTracker {
         const task = this.tasks.find(t => t.id === id);
         if (task) {
             task.status = "failed";
-            console.log(chalk.red(`\n❌ Failed Task: `) + task.title);
+            this.render();
         }
     }
 
-    list() {
+    clear() {
+        if (this.lastRenderedLines > 0) {
+            // Move cursor up by the number of lines we rendered
+            readline.moveCursor(process.stdout, 0, -this.lastRenderedLines);
+            readline.clearScreenDown(process.stdout);
+            this.lastRenderedLines = 0;
+        }
+    }
+
+    detach() {
+        this.lastRenderedLines = 0;
+    }
+
+    render() {
+        if (this.tasks.length === 0) return;
+        
+        this.clear();
+
+        let output = chalk.bold.cyan("\n📋 Live Task List:\n");
+        let lines = 2; // Account for the \n and title
+
         for (const task of this.tasks) {
             let icon = "⏳";
             let color = chalk.dim;
@@ -61,8 +82,11 @@ export class TaskTracker {
                 color = chalk.yellow;
             }
 
-            console.log(`  ${icon} ${color(task.title)}`);
+            output += `  ${icon} ${color(task.title)}\n`;
+            lines++;
         }
-        console.log();
+        
+        process.stdout.write(output);
+        this.lastRenderedLines = lines;
     }
 }

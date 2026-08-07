@@ -5,6 +5,7 @@ import { getAgentModel } from "../../ai/ai.config.ts";
 import { ActionTracker } from "../agent/action-tracker.ts";
 import { ToolExecutor } from "../agent/tool-executor.ts";
 import { createAgentTools } from "../agent/agent-tools.ts";
+import { TaskTracker } from "../agent/task-tracker.ts";
 import { defaultAgentConfig } from "../agent/types.ts";
 import { runApprovalFlow } from "../agent/approval.ts";
 import { renderTerminalMarkdown } from "../../tui/terminal-md.ts";
@@ -57,10 +58,16 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
   const tracker = new ActionTracker();
   const executor = new ToolExecutor(tracker, config);
 
+  const taskTracker = new TaskTracker();
+  taskTracker.setTasks(selected.map((step, idx) => ({
+      id: `step-${idx}`,
+      title: step.title,
+      status: "pending"
+  })));
 
   const hasWeb = !!process.env.FIRECRAWL_API_KEY;
   const tools = {
-    ...createAgentTools(executor),
+    ...createAgentTools(executor, taskTracker),
     ...(hasWeb ? createWebTools(tracker) : {}),
     ...getAITools(),
   };
@@ -68,7 +75,11 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
   // Temporarily detach activity tracker listeners so they don't corrupt the scrolling history
   activityEvents.clear();
 
+  let currentStepIdx = 0;
   for (const step of selected) {
+    const taskId = `step-${currentStepIdx}`;
+    taskTracker.start(taskId);
+
     const s = spinner();
     s.start(chalk.bold(`🔧 ${step.title}`));
 
@@ -108,6 +119,12 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
     });
 
     s.stop(chalk.bold(`✔ 🔧 ${step.title}`));
+    taskTracker.complete(taskId);
+    currentStepIdx++;
+
+    if (allToolCalls.length > 0 || r.text) {
+        taskTracker.detach();
+    }
 
     if (allToolCalls.length > 0) {
       console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));

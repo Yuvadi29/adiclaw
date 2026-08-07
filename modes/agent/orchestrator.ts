@@ -176,6 +176,10 @@ export async function runAgentMode(initialGoal?: string) {
                 activity.stop("Agent Finished");
             }
 
+            if (responseText || allToolCalls.length > 0) {
+                taskTracker.detach();
+            }
+
             if (responseText) {
                 console.log(renderTerminalMarkdown(responseText));
             }
