@@ -123,7 +123,7 @@ export async function runWakeUp() {
   
   console.log(memory.stats());
   
-  console.log(memory.search("bun"));
+  console.log(memory.search("bun"));   
 
   // Show active config
   console.log(
