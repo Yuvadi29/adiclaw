@@ -3,15 +3,10 @@
 import { Command } from "commander";
 import { runWakeUp } from "./tui/wakeup";
 import { setupShutdownHandlers, shutdown } from "./ai/session/shutdown";
-import { MemoryStorage } from "./memory/storage";
 
 setupShutdownHandlers();
 
 const program = new Command();
-const storage = new MemoryStorage();
-storage.initialize();
-console.log(storage.getMemoryFile());
-console.log(storage.load())
 
 program.name("adiclaw").description("AdiClaw CLI Tool").version("0.0.1");
 
