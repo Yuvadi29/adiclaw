@@ -5,8 +5,15 @@ import type { CommandContext } from "../commands/types";
 import { shutdown } from "../ai/session/shutdown";
 import * as readline from "readline/promises";
 import { select, isCancel } from "@clack/prompts";
+import { loadHistory, appendHistory } from "./history";
 
 const PROMPT = chalk.hex("#A5B4FC")("adiclaw") + chalk.dim(" > ");
+
+function completer(line: string) {
+    const completions = registry.list().map(c => `/${c.name}`);
+    const hits = completions.filter((c) => c.startsWith(line));
+    return [hits.length ? hits : completions, line];
+}
 
 export async function runREPL() {
     console.log(
@@ -14,6 +21,7 @@ export async function runREPL() {
     );
 
     let prefilledInput = "";
+    const globalHistory = loadHistory();
     
     // We recreate the readline interface in each loop iteration.
     // This is vital to ensure readline is COMPLETELY detached when @clack/prompts 
@@ -22,6 +30,8 @@ export async function runREPL() {
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout,
+            history: globalHistory,
+            completer: completer,
         });
 
         if (prefilledInput) {
@@ -94,6 +104,12 @@ export async function runREPL() {
         // If we reached here, the user actually pressed Enter on the rl prompt
         const input = answer.trim();
         if (!input) continue;
+        
+        // Don't add duplicate of previous command to history
+        if (globalHistory[0] !== input) {
+            globalHistory.unshift(input);
+            appendHistory(input);
+        }
 
         // Command executes with full terminal control (rl is dead)
         const handled = await router.handle(input);
