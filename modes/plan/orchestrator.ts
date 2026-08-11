@@ -87,11 +87,11 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
       model: getAgentModel(),
       stopWhen: stepCountIs(30),
       instructions: buildSystemPrompt({
-          mode: "plan",
+          mode: "agent",
           userPrompt: plan.goal,
           workspaceRoot: config.codebasePath,
           hasWeb
-      }) + "\nAll mutations are staged until approval.",
+      }) + `\nCRITICAL: You are executing ONE step of a larger plan. ONLY focus on completing this exact step. DO NOT output the entire plan. Step to execute: ${step.title}\nAll mutations are staged until approval.`,
       tools
     });
 
@@ -107,7 +107,8 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
         if (toolCalls && toolCalls.length > 0) {
           const latestTc = toolCalls[toolCalls.length - 1];
           if (latestTc) {
-            s.message(`Using tool: ${latestTc.toolName}`);
+            s.stop(chalk.dim(`  ↳ Used tool: ${latestTc.toolName}`));
+            s.start(chalk.bold(`🔧 ${step.title}`));
           }
         }
         for (const tc of toolCalls) {

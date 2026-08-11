@@ -215,6 +215,11 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         const answer = responseText?.trim() || "(no answer)";
         messages = (await result.response).messages;
 
+        activity.stop();
+
+        console.log(renderTerminalMarkdown(answer));
+        console.log();
+
         const nextInput = await text({
             message: "Continue chatting? (leave empty to exit or save)"
         });
