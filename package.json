@@ -27,6 +27,8 @@
     "commander": "^15.0.0",
     "diff": "^9.0.0",
     "figlet": "^1.11.4",
+    "google-auth-library": "^11.0.1",
+    "googleapis": "^174.0.1",
     "marked": "^18.0.7",
     "marked-terminal": "^7.3.0",
     "mermaid-ascii": "^1.0.0",
