@@ -72,10 +72,55 @@ function getToolMessage(toolName: string, input: any): string {
         case "obsidian_read":
             return `📓 Reading Note`;
 
+        case "youtube_analytics":
+            return `📊 Fetching YouTube Analytics (${input?.period || "28d"})`;
+
+        case "youtube_channel":
+            return `📺 Fetching YouTube Channel Info`;
+
+        case "youtube_list_videos":
+            return `🎬 Listing YouTube Videos (${input?.limit || 10} videos)`;
+
+        case "youtube_search_videos":
+            return `🔍 Searching YouTube: "${input?.query || ""}"`;
+
+        case "youtube_video_details":
+            return `📹 Fetching YouTube Video Details`;
+
+        case "youtube_video_comments":
+            return `💬 Fetching YouTube Video Comments`;
+
+        case "youtube_render_dashboard":
+            return `📊 Rendering YouTube Dashboard`;
+
         default:
             return `⚙️ ${toolName}`;
     }
 }
+
+function formatToolCallBadge(toolName: string, args: any): string {
+
+    let sourceBadge = chalk.bgHex("#334155").white.bold(" WORKSPACE ");
+    if (toolName.startsWith("youtube_")) {
+        sourceBadge = chalk.bgHex("#FF0000").white.bold(" MCP: YOUTUBE ");
+    } else if (toolName.startsWith("github_")) {
+        sourceBadge = chalk.bgHex("#24292E").white.bold(" MCP: GITHUB ");
+    } else if (toolName.startsWith("web_") || toolName === "fetch_url") {
+        sourceBadge = chalk.bgHex("#0284C7").white.bold(" WEB ");
+    } else if (toolName.startsWith("obsidian_")) {
+        sourceBadge = chalk.bgHex("#7C3AED").white.bold(" OBSIDIAN ");
+    }
+
+    const argsObj = args ?? {};
+    const argsSummary = Object.entries(argsObj)
+        .map(([k, v]) => `${chalk.dim(k)}=${chalk.cyan(typeof v === "string" ? `"${v}"` : JSON.stringify(v))}`)
+        .join(" ");
+
+    const formattedArgs = argsSummary ? chalk.dim(` (${argsSummary})`) : "";
+    return `${sourceBadge} ${chalk.bold.white(toolName)}${formattedArgs}`;
+}
+
+
 
 export async function runAgentMode(initialGoal?: string) {
     console.log(chalk.bold("Running Agent Mode"));
@@ -143,7 +188,7 @@ export async function runAgentMode(initialGoal?: string) {
             //Loader
             activity.start("Thinking...");
 
-            const allToolCalls: { toolName: string, input: any }[] = [];
+            const allToolCalls: { toolName: string; args: any }[] = [];
 
             const generateOpts: any = {
                 onStepFinish: ({ toolCalls, usage }: any) => {
@@ -154,10 +199,11 @@ export async function runAgentMode(initialGoal?: string) {
                             u.completionTokens ?? u.outputTokens ?? 0,
                         );
                     }
-                    for (const tc of toolCalls) {
+                    for (const tc of toolCalls ?? []) {
                         if (!tc) continue;
                         sessionTracker.incrementToolCalls();
-                        allToolCalls.push(tc);
+                        const args = tc.args ?? tc.input ?? {};
+                        allToolCalls.push({ toolName: tc.toolName, args });
                     }
                 }
             };
@@ -185,17 +231,13 @@ export async function runAgentMode(initialGoal?: string) {
             }
 
             if (allToolCalls.length > 0) {
-                console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
+                console.log(chalk.bold.cyan("\n🛠️  MCP & Tools Executed:"));
                 for (const tc of allToolCalls) {
-                    const preview = JSON.stringify(tc.input).slice(0, 80);
-                    console.log(
-                        chalk.green(' ✔️'),
-                        chalk.bold(getToolMessage(String(tc.toolName), tc.input)),
-                        chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
-                    );
+                    console.log(chalk.green("  ✔ "), formatToolCallBadge(tc.toolName, tc.args));
                 }
                 console.log();
             }
+
         } catch (err) {
             activity.fail("Agent Failed");
             activity.stop();

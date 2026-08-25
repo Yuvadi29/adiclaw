@@ -104,6 +104,27 @@ function asMd(question: string, answer: string): string {
     return `# Ask Mode\n\n## Question\n\n${question.trim()}\n\n## Answer\n\n${answer.trim()}\n`;
 };
 
+function formatToolCallBadge(toolName: string, args: any): string {
+    let sourceBadge = chalk.bgHex("#334155").white.bold(" WORKSPACE ");
+    if (toolName.startsWith("youtube_")) {
+        sourceBadge = chalk.bgHex("#FF0000").white.bold(" MCP: YOUTUBE ");
+    } else if (toolName.startsWith("github_")) {
+        sourceBadge = chalk.bgHex("#24292E").white.bold(" MCP: GITHUB ");
+    } else if (toolName.startsWith("web_") || toolName === "fetch_url") {
+        sourceBadge = chalk.bgHex("#0284C7").white.bold(" WEB ");
+    } else if (toolName.startsWith("obsidian_")) {
+        sourceBadge = chalk.bgHex("#7C3AED").white.bold(" OBSIDIAN ");
+    }
+
+    const argsObj = args ?? {};
+    const argsSummary = Object.entries(argsObj)
+        .map(([k, v]) => `${chalk.dim(k)}=${chalk.cyan(typeof v === "string" ? `"${v}"` : JSON.stringify(v))}`)
+        .join(" ");
+
+    const formattedArgs = argsSummary ? chalk.dim(` (${argsSummary})`) : "";
+    return `${sourceBadge} ${chalk.bold.white(toolName)}${formattedArgs}`;
+}
+
 export async function runAskMode(initialQuestion?: string): Promise<void> { 
     console.log(chalk.bold("\n❓ Ask Mode\n"));
     activityEvents.onStart(msg => activity.update(msg));
@@ -143,7 +164,8 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         model: getAgentModel(),
         stopWhen: stepCountIs(20),
         instructions: [
-            "You are a helpful AI assistant. You have access to tools that can read the file system. YOU MUST USE THESE TOOLS natively to answer the user's questions.",
+            "You are a helpful AI assistant. You have access to tools that can read the file system and query external services via Model Context Protocol (MCP).",
+            "YOU MUST USE THESE TOOLS natively to answer the user's questions.",
             "DO NOT write scripts to read files. DO NOT hallucinate file contents. ALWAYS use the `read_file` or `search_files` tool first to gather information.",
             "CRITICAL: You are in READ-ONLY mode. You CANNOT create, modify, or delete files. If the user asks you to create a file, you MUST inform them to use /agent or /plan mode instead.",
             `Workspace root: ${config.codebasePath}`,
@@ -151,6 +173,14 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."
                 : "Web tools are unavailable.",
+            "MCP TOOLS INSTRUCTIONS:",
+            "- For Coding Adda YouTube questions (top videos, analytics, subscriber count, video search, comments):",
+            "  * Use `youtube_top_videos` when asked for top performing, most viewed, or popular videos.",
+            "  * Use `youtube_analytics` for 7d/28d/90d performance reports and metrics.",
+            "  * Use `youtube_channel` for channel subscriber count and overview.",
+            "  * Use `youtube_search_videos` to search videos by topic.",
+            "  * Use `youtube_list_videos` with order='date' for latest uploads.",
+            "- For GitHub questions (issues, pull requests, repository info), use the relevant `github_*` MCP tools.",
             "CRITICAL RULES FOR OBSIDIAN VAULT:",
             "1. Whenever you are asked to work on a project, search for notes, or check Obsidian, you MUST use the 'obsidian_search' tool first.",
             "2. DO NOT use 'search_files' or 'list_files' to look for Obsidian notes. The vault is outside the workspace and ONLY accessible via 'obsidian_search' and 'obsidian_read'.",
@@ -174,7 +204,7 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
 
     while (true) {
         activity.start("Thinking...");
-        const allToolCalls: { toolName: string, input: any }[] = [];
+        const allToolCalls: { toolName: string; args: any }[] = [];
 
         const generateOpts: any = {
             onStepFinish: ({ toolCalls, usage }: any) => {
@@ -182,10 +212,15 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
                     const u = usage as any;
                     sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
                 }
-                for (const tc of toolCalls) {
+                for (const tc of toolCalls ?? []) {
                     if (!tc) continue;
                     sessionTracker.incrementToolCalls();
-                    allToolCalls.push(tc);
+                    const args = tc.args ?? tc.input ?? {};
+                    allToolCalls.push({
+                        toolName: tc.toolName,
+                        args,
+                    });
+                    activity.update(`Running ${tc.toolName}...`);
                 }
             }
         };
@@ -197,25 +232,21 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         }
 
         const result = await agent.stream(generateOpts);
-
-        if (allToolCalls.length > 0) {
-            console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
-            for (const tc of allToolCalls) {
-                const preview = JSON.stringify(tc.input).slice(0, 80);
-                console.log(
-                    chalk.green(' ✔️'),
-                    chalk.bold(String(tc.toolName)),
-                    chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
-                );
-            }
-            console.log();
-        }
-
         const responseText = await result.text;
         const answer = responseText?.trim() || "(no answer)";
         messages = (await result.response).messages;
 
-        activity.stop();
+        if (activity.isBusy) {
+            activity.stop();
+        }
+
+        if (allToolCalls.length > 0) {
+            console.log(chalk.bold.cyan("\n🛠️  MCP & Tools Executed:"));
+            for (const tc of allToolCalls) {
+                console.log(chalk.green("  ✔ "), formatToolCallBadge(tc.toolName, tc.args));
+            }
+            console.log();
+        }
 
         console.log(renderTerminalMarkdown(answer));
         console.log();
@@ -223,6 +254,7 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         const nextInput = await text({
             message: "Continue chatting? (leave empty to exit or save)"
         });
+
 
         if (isCancel(nextInput) || !(nextInput as string).trim()) {
             break;

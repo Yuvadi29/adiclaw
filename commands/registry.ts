@@ -20,3 +20,5 @@ export class CommandRegistry {
         ]
     }
 }
+
+export const registry = new CommandRegistry();

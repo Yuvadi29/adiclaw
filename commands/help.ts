@@ -1,6 +1,7 @@
 import chalk from "chalk";
-import { registry } from "./index";
+import { registry } from "./registry";
 import type { Command } from "./types";
+
 
 export const helpCommand: Command = {
     name: "help",

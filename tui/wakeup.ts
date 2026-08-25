@@ -5,6 +5,7 @@ import { sessionTracker } from "../ai/session/session-tracker";
 import { loadConfig } from "../config/config";
 import { runREPL } from "./repl";
 import { memory } from "../memory";
+import { setYouTubeSession } from "../youtube/session";
 
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
@@ -110,34 +111,37 @@ export async function runWakeUp() {
   const { scan } = await import("../workspace/scanner");
   await scan(process.cwd());
 
+  // Coding Adda Analytics
+  console.log(chalk.gray("Loading Coding Adda analytics..."));
+
+  try {
+    const { getMyChannel } = await import("../youtube/channel");
+
+    const { getCodingAddaAnalytics } = await import("../youtube/analytics");
+
+    const { renderYouTubeDashboard } = await import("../youtube/dashboard");
+
+    const channel = await getMyChannel();
+
+    const analytics = await getCodingAddaAnalytics();
+
+    setYouTubeSession(channel, analytics);
+
+    renderYouTubeDashboard(channel, analytics);
+  } catch (error) {
+    console.log(chalk.yellow("⚠ Could not load YouTube analytics."));
+
+    if (process.env.NODE_ENV === "development") {
+      console.error(error);
+    }
+  }
+
   //Initializing Memory
   console.log(chalk.grey("Loading Memory...."));
   memory.initialize();
-  console.log(memory.all());
+  console.log(chalk.grey("Memory Loaded.."));
 
-  memory.remember({
-    type: "workflow",
-
-    text: "Always use Bun instead of npm.",
-
-    tags: ["bun", "package", "runtime"],
-
-    source: "user",
-  });
-
-  memory.remember({
-    type: "workflow",
-
-    text: "Prefer TypeScript.",
-
-    tags: ["typescript"],
-
-    source: "user",
-  });
-
-  console.log(memory.stats());
-
-  console.log(memory.search("bun"));
+  // console.log(memory.all());
 
   // Show active config
   console.log(

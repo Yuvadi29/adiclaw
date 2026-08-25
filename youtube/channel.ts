@@ -28,7 +28,7 @@ export async function getMyChannel(): Promise<YouTubeChannelSummary> {
     throw new Error(
       [
         "Coding Adda YouTube channel could not be found.",
-        `Channel ID: ${CODING_ADDA_CHANNEL_ID}`,
+        `Channel ID: ${CHANNEL_ID}`,
         "",
         "Check that the configured channel ID is correct.",
       ].join("\n"),

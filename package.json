@@ -32,6 +32,7 @@
     "marked": "^18.0.7",
     "marked-terminal": "^7.3.0",
     "mermaid-ascii": "^1.0.0",
-    "ollama": "^0.6.3"
+    "ollama": "^0.6.3",
+    "terminal-image": "^5.0.1"
   }
 }
