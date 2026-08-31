@@ -19,7 +19,8 @@ import { sessionTracker } from "../../ai/session/session-tracker.ts";
 import { getAITools } from "../../mcp/index.ts";
 import { buildWorkspaceSummary } from "../../workspace/summary.ts";
 import { buildSystemPrompt } from "../../context/prompt-builder.ts";
-
+import { extractFileMentions } from "../../input/file-mentions.ts";
+import { buildFileContents } from "../../input/build-file-contents.ts";
 
 function stepPrompt(goal: string, step: PlanStep): string {
   return [`Goal: ${goal}`, `Step: ${step.title}`, step.description].join('\n');
@@ -40,7 +41,18 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
     goal = input.trim();
   }
 
-  const plan = await generatePlan(goal);
+  activity.start("Parsing file mentions...");
+  let finalGoal = goal;
+  const mentions = extractFileMentions(goal);
+  if (mentions.length > 0) {
+      const fileData = await buildFileContents(mentions);
+      if (fileData) {
+          finalGoal = `${goal}\n\n${fileData}`;
+      }
+  }
+  activity.stop();
+
+  const plan = await generatePlan(finalGoal);
 
   printPlan(plan);
 

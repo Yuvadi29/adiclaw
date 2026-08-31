@@ -15,6 +15,8 @@ import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
 import { buildSystemPrompt } from "../../context/prompt-builder";
+import { extractFileMentions } from "../../input/file-mentions";
+import { buildFileContents } from "../../input/build-file-contents";
 
 function getToolMessage(toolName: string, input: any): string {
     switch (toolName) {
@@ -185,6 +187,17 @@ export async function runAgentMode(initialGoal?: string) {
         let result;
 
         try {
+            activity.start("Parsing file mentions...");
+            
+            let finalInput = currentInput;
+            const mentions = extractFileMentions(currentInput);
+            if (mentions.length > 0) {
+                const fileData = await buildFileContents(mentions);
+                if (fileData) {
+                    finalInput = `${currentInput}\n\n${fileData}`;
+                }
+            }
+
             //Loader
             activity.start("Thinking...");
 
@@ -209,9 +222,9 @@ export async function runAgentMode(initialGoal?: string) {
             };
 
             if (messages.length > 0) {
-                generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: currentInput }] }];
+                generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: finalInput }] }];
             } else {
-                generateOpts.prompt = currentInput;
+                generateOpts.prompt = finalInput;
             }
 
             result = await agent.stream(generateOpts);

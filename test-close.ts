@@ -20,7 +20,7 @@ async function run() {
             output: process.stdout,
             prompt: "adiclaw > ",
         });
-        rl.on("line", ...); // This is getting messy with events
+        // rl.on("line", ...); // This is getting messy with events
     });
 }
 run();

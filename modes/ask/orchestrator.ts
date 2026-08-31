@@ -14,6 +14,8 @@ import { activityEvents } from "../agent/activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
 import { buildWorkspaceSummary } from "../../workspace/summary";
+import { extractFileMentions } from "../../input/file-mentions";
+import { buildFileContents } from "../../input/build-file-contents";
 function createAskTools(executor: ToolExecutor) {
     return {
         read_file: tool({
@@ -203,6 +205,17 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     let currentInput = question.trim();
 
     while (true) {
+        activity.start("Parsing file mentions...");
+        
+        let finalInput = currentInput;
+        const mentions = extractFileMentions(currentInput);
+        if (mentions.length > 0) {
+            const fileData = await buildFileContents(mentions);
+            if (fileData) {
+                finalInput = `${currentInput}\n\n${fileData}`;
+            }
+        }
+
         activity.start("Thinking...");
         const allToolCalls: { toolName: string; args: any }[] = [];
 
@@ -226,9 +239,9 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         };
 
         if (messages.length > 0) {
-            generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: currentInput }] }];
+            generateOpts.messages = [...messages, { role: "user", content: [{ type: "text", text: finalInput }] }];
         } else {
-            generateOpts.prompt = currentInput;
+            generateOpts.prompt = finalInput;
         }
 
         const result = await agent.stream(generateOpts);

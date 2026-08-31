@@ -5,14 +5,18 @@ import type { CommandContext } from "../commands/types";
 import { shutdown } from "../ai/session/shutdown";
 import * as readline from "readline/promises";
 import { select, isCancel } from "@clack/prompts";
+import { autocomplete } from "@clack/prompts";
 import { loadHistory, appendHistory } from "./history";
+import { workspace } from "../workspace";
+import path from "path";
+import { runAskMode } from "../modes/ask/orchestrator";
 
 const PROMPT = chalk.hex("#A5B4FC")("adiclaw") + chalk.dim(" > ");
 
 function completer(line: string) {
     const completions = registry.list().map(c => `/${c.name}`);
     const hits = completions.filter((c) => c.startsWith(line));
-    return [hits.length ? hits : completions, line];
+    return [hits.length ? hits : completions, line] as [string[], string];
 }
 
 export async function runREPL() {
@@ -51,6 +55,7 @@ export async function runREPL() {
         const router = new CommandRouter(registry, context);
 
         let slashIntercepted = false;
+        let atIntercepted = false;
 
         const onKeypress = (str: string, key: any) => {
             // Intercept slash if it's the first character on the line
@@ -63,6 +68,20 @@ export async function runREPL() {
                     slashIntercepted = true;
                     rl.write('\n'); // Force rl.question to resolve so we can safely exit the readline loop
                 }, 10);
+            }
+
+            // Intercept @ symbol if it's preceded by space or at start of line
+            if (str === "@") {
+                const isAtStartOrSpace = rl.line === "@" || rl.line.endsWith(" @");
+                if (isAtStartOrSpace) {
+                    setTimeout(() => {
+                        if (!rl.line.endsWith("@")) return;
+
+                        process.stdout.write('\x1b[2K\r'); // clear line
+                        atIntercepted = true;
+                        rl.write('\n'); // Force rl.question to resolve
+                    }, 10);
+                }
             }
         };
 
@@ -101,6 +120,35 @@ export async function runREPL() {
             continue; // Restart the loop (creates a fresh rl)
         }
 
+        if (atIntercepted) {
+            const cwd = process.cwd();
+            const files = workspace.list().map(f => {
+                const rel = path.relative(cwd, f.path);
+                return {
+                    label: rel,
+                    value: rel,
+                };
+            });
+
+            process.stdout.write('\x1b[s'); // Save cursor
+            console.log(); // Give clack room to render
+
+            const choice = await autocomplete({
+                message: "Mention a file",
+                options: files,
+                placeholder: 'Type a filename...',
+            });
+
+            process.stdout.write('\x1b[u\x1b[J'); // Restore cursor and erase menu
+
+            if (!isCancel(choice)) {
+                prefilledInput = answer.substring(0, answer.length - 1) + `@${choice} `;
+            } else {
+                prefilledInput = answer; 
+            }
+            continue;
+        }
+
         // If we reached here, the user actually pressed Enter on the rl prompt
         const input = answer.trim();
         if (!input) continue;
@@ -116,7 +164,7 @@ export async function runREPL() {
 
         if (!handled) {
             // Not a slash command — treat as a natural-language prompt
-            console.log(chalk.dim("  (AI chat coming soon — use /help to see commands)\n"));
+            await runAskMode(input);
         }
     }
 }
