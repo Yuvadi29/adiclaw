@@ -92,8 +92,9 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
     const taskId = `step-${currentStepIdx}`;
     taskTracker.start(taskId);
 
-    const s = spinner();
-    s.start(chalk.bold(`🔧 ${step.title}`));
+    sessionTracker.startTurn();
+    activity.setStep(currentStepIdx + 1, selected.length);
+    activity.start(`🔧 ${step.title}`);
 
     const agent = new ToolLoopAgent({
       model: getAgentModel(),
@@ -116,40 +117,23 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
             const u = usage as any;
             sessionTracker.addTokens(u.promptTokens ?? u.inputTokens ?? 0, u.completionTokens ?? u.outputTokens ?? 0);
         }
-        if (toolCalls && toolCalls.length > 0) {
-          const latestTc = toolCalls[toolCalls.length - 1];
-          if (latestTc) {
-            s.stop(chalk.dim(`  ↳ Used tool: ${latestTc.toolName}`));
-            s.start(chalk.bold(`🔧 ${step.title}`));
-          }
-        }
-        for (const tc of toolCalls) {
-          if (!tc) continue;
-          sessionTracker.incrementToolCalls();
+        for (const tc of toolCalls ?? []) {
+          const tcAny = tc as any;
+          const args = tcAny.args ?? tcAny.input ?? {};
           allToolCalls.push(tc);
+          activity.logCompletedAction(tcAny.toolName, args);
         }
+        activity.update(`🔧 ${step.title}`);
       }
     });
 
-    s.stop(chalk.bold(`✔ 🔧 ${step.title}`));
+    sessionTracker.endTurn();
+    activity.stop(`Completed step: ${step.title}`);
     taskTracker.complete(taskId);
     currentStepIdx++;
 
     if (allToolCalls.length > 0 || r.text) {
         taskTracker.detach();
-    }
-
-    if (allToolCalls.length > 0) {
-      console.log(chalk.bold.cyan("\n🛠️  Tools Executed:"));
-      for (const tc of allToolCalls) {
-        const preview = JSON.stringify(tc.input).slice(0, 80);
-        console.log(
-          chalk.green(' ✔️'),
-          chalk.bold(String(tc.toolName)),
-          chalk.dim(preview + (preview.length >= 80 ? "..." : ""))
-        );
-      }
-      console.log();
     }
 
     if (r.text) {

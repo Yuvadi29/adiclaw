@@ -1,10 +1,19 @@
-type Listener = (message: string) => void;
+export interface ActivityEventData {
+    message: string;
+    toolName?: string;
+    args?: any;
+    durationMs?: number;
+    category?: string;
+    isSilent?: boolean;
+}
+
+export type ActivityListener = (message: string, data?: ActivityEventData) => void;
 
 class ActivityEvents {
-    private startListeners: Listener[] = [];
-    private finishListeners: Listener[] = [];
-    private silentFinishListeners: Listener[] = [];
-    private failListeners: Listener[] = [];
+    private startListeners: ActivityListener[] = [];
+    private finishListeners: ActivityListener[] = [];
+    private silentFinishListeners: ActivityListener[] = [];
+    private failListeners: ActivityListener[] = [];
 
     clear() {
         this.startListeners = [];
@@ -13,36 +22,44 @@ class ActivityEvents {
         this.failListeners = [];
     }
 
-    onStart(fn: Listener) {
+    onStart(fn: ActivityListener) {
         this.startListeners.push(fn);
     }
 
-    onFinish(fn: Listener) {
+    onFinish(fn: ActivityListener) {
         this.finishListeners.push(fn);
     }
 
-    onSilentFinish(fn: Listener) {
+    onSilentFinish(fn: ActivityListener) {
         this.silentFinishListeners.push(fn);
     }
 
-    onFail(fn: Listener) {
+    onFail(fn: ActivityListener) {
         this.failListeners.push(fn);
     }
 
-    start(msg: string) {
-        this.startListeners.forEach(l => l(msg));
+    start(msgOrData: string | ActivityEventData) {
+        const msg = typeof msgOrData === "string" ? msgOrData : msgOrData.message;
+        const data = typeof msgOrData === "string" ? { message: msgOrData } : msgOrData;
+        this.startListeners.forEach(l => l(msg, data));
     }
 
-    finish(msg: string) {
-        this.finishListeners.forEach(l => l(msg));
+    finish(msgOrData: string | ActivityEventData) {
+        const msg = typeof msgOrData === "string" ? msgOrData : msgOrData.message;
+        const data = typeof msgOrData === "string" ? { message: msgOrData } : msgOrData;
+        this.finishListeners.forEach(l => l(msg, data));
     }
 
-    silentFinish(msg: string) {
-        this.silentFinishListeners.forEach(l => l(msg));
+    silentFinish(msgOrData: string | ActivityEventData) {
+        const msg = typeof msgOrData === "string" ? msgOrData : msgOrData.message;
+        const data = typeof msgOrData === "string" ? { message: msgOrData } : msgOrData;
+        this.silentFinishListeners.forEach(l => l(msg, data));
     }
 
-    fail(msg: string) {
-        this.failListeners.forEach(l => l(msg));
+    fail(msgOrData: string | ActivityEventData) {
+        const msg = typeof msgOrData === "string" ? msgOrData : msgOrData.message;
+        const data = typeof msgOrData === "string" ? { message: msgOrData } : msgOrData;
+        this.failListeners.forEach(l => l(msg, data));
     }
 }
 

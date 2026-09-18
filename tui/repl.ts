@@ -10,8 +10,18 @@ import { loadHistory, appendHistory } from "./history";
 import { workspace } from "../workspace";
 import path from "path";
 import { runAskMode } from "../modes/ask/orchestrator";
+import { aiSession } from "../ai/session";
+import { sessionTracker } from "../ai/session/session-tracker";
 
-const PROMPT = chalk.hex("#A5B4FC")("adiclaw") + chalk.dim(" > ");
+function getSessionRibbon(): string {
+    const sess = aiSession.get();
+    const model = sess.model ? sess.model.split("/").pop() : "default";
+    const ticker = sessionTracker.getTickerSummary();
+    
+    return `${chalk.dim("╭─")} ${chalk.hex("#818CF8").bold("🐾 AdiClaw")} ${chalk.dim("│")} ${chalk.cyan(`🤖 ${model}`)} ${chalk.dim("│")} ${chalk.yellowBright(ticker)}`;
+}
+
+const PROMPT = `${chalk.dim("╰─")} ${chalk.hex("#A5B4FC").bold("adiclaw")} ${chalk.dim("> ")}`;
 
 function completer(line: string) {
     const completions = registry.list().map(c => `/${c.name}`);
@@ -31,6 +41,10 @@ export async function runREPL() {
     // This is vital to ensure readline is COMPLETELY detached when @clack/prompts 
     // runs during commands, preventing keyboard duplication glitches!
     while (true) {
+        if (!prefilledInput) {
+            console.log(getSessionRibbon());
+        }
+
         const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout,

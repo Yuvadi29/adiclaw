@@ -9,13 +9,14 @@ import { defaultAgentConfig } from "../agent/types";
 import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "../agent/approval";
 import { createWebTools } from "../plan/web-tools";
-import { activity } from "../../tui/activity";
+import { activity, formatToolCallBadge } from "../../tui/activity";
 import { activityEvents } from "../agent/activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
 import { buildWorkspaceSummary } from "../../workspace/summary";
 import { extractFileMentions } from "../../input/file-mentions";
 import { buildFileContents } from "../../input/build-file-contents";
+
 function createAskTools(executor: ToolExecutor) {
     return {
         read_file: tool({
@@ -104,40 +105,15 @@ function createAskTools(executor: ToolExecutor) {
 
 function asMd(question: string, answer: string): string {
     return `# Ask Mode\n\n## Question\n\n${question.trim()}\n\n## Answer\n\n${answer.trim()}\n`;
-};
-
-function formatToolCallBadge(toolName: string, args: any): string {
-    let sourceBadge = chalk.bgHex("#334155").white.bold(" WORKSPACE ");
-    if (toolName.startsWith("youtube_")) {
-        sourceBadge = chalk.bgHex("#FF0000").white.bold(" MCP: YOUTUBE ");
-    } else if (toolName.startsWith("github_")) {
-        sourceBadge = chalk.bgHex("#24292E").white.bold(" MCP: GITHUB ");
-    } else if (toolName.startsWith("web_") || toolName === "fetch_url") {
-        sourceBadge = chalk.bgHex("#0284C7").white.bold(" WEB ");
-    } else if (toolName.startsWith("obsidian_")) {
-        sourceBadge = chalk.bgHex("#7C3AED").white.bold(" OBSIDIAN ");
-    }
-
-    const argsObj = args ?? {};
-    const argsSummary = Object.entries(argsObj)
-        .map(([k, v]) => `${chalk.dim(k)}=${chalk.cyan(typeof v === "string" ? `"${v}"` : JSON.stringify(v))}`)
-        .join(" ");
-
-    const formattedArgs = argsSummary ? chalk.dim(` (${argsSummary})`) : "";
-    return `${sourceBadge} ${chalk.bold.white(toolName)}${formattedArgs}`;
 }
 
 export async function runAskMode(initialQuestion?: string): Promise<void> { 
     console.log(chalk.bold("\n❓ Ask Mode\n"));
-    activityEvents.onStart(msg => activity.update(msg));
-    activityEvents.onFinish(msg => activity.success(msg));
-    activityEvents.onSilentFinish(msg => activity.done(msg));
-    activityEvents.onFail(msg => activity.fail(msg));
 
     let question = initialQuestion;
     if (!question) {
         const input = await text({
-            message: "What do you want to ask ?",
+            message: "What do you want to ask?",
             placeholder: "e.g. How does the router work?",
         });
         if (isCancel(input) || !input.trim()) return;
@@ -205,6 +181,8 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     let currentInput = question.trim();
 
     while (true) {
+        sessionTracker.startTurn();
+
         activity.start("Parsing file mentions...");
         
         let finalInput = currentInput;
@@ -233,7 +211,14 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
                         toolName: tc.toolName,
                         args,
                     });
+                    
+                    // Live log completed tool to activity feed
+                    activity.logCompletedAction(tc.toolName, args);
                     activity.update(`Running ${tc.toolName}...`);
+                }
+                
+                if (!toolCalls || toolCalls.length === 0) {
+                    activity.update("Thinking...");
                 }
             }
         };
@@ -249,16 +234,10 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
         const answer = responseText?.trim() || "(no answer)";
         messages = (await result.response).messages;
 
+        sessionTracker.endTurn();
+
         if (activity.isBusy) {
             activity.stop();
-        }
-
-        if (allToolCalls.length > 0) {
-            console.log(chalk.bold.cyan("\n🛠️  MCP & Tools Executed:"));
-            for (const tc of allToolCalls) {
-                console.log(chalk.green("  ✔ "), formatToolCallBadge(tc.toolName, tc.args));
-            }
-            console.log();
         }
 
         console.log(renderTerminalMarkdown(answer));
@@ -268,7 +247,6 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
             message: "Continue chatting? (leave empty to exit or save)"
         });
 
-
         if (isCancel(nextInput) || !(nextInput as string).trim()) {
             break;
         }
@@ -276,7 +254,7 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     }
 
     const wantToSave = await confirm({
-        message: "Save this conversation to a markdown file in the current directory ?",
+        message: "Save this conversation to a markdown file in the current directory?",
         initialValue: false,
     });
     if (isCancel(wantToSave) || !wantToSave) return;

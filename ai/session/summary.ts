@@ -16,28 +16,33 @@ export function printSessionSummary() {
     
     const elapsedMs = ((s.endedAt ?? Date.now()) - s.startedAt);
     const fmt = (n: number) => n.toLocaleString();
+    const costStr = sessionTracker.getFormattedCost();
     
     console.log();
-    console.log(chalk.cyan("╭────────────────────────────────────────────────────────────╮"));
-    console.log(chalk.cyan("│") + " ".repeat(21) + chalk.bold("AdiClaw Session") + " ".repeat(24) + chalk.cyan("│"));
-    console.log(chalk.cyan("├────────────────────────────────────────────────────────────┤"));
+    console.log(chalk.hex("#6366F1")("╭────────────────────────────────────────────────────────────╮"));
+    console.log(chalk.hex("#6366F1")("│") + " ".repeat(21) + chalk.bold.whiteBright("AdiClaw Session") + " ".repeat(24) + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("├────────────────────────────────────────────────────────────┤"));
     
-    console.log(chalk.cyan("│") + ` Provider        ${(s.provider || "-").padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + ` Model           ${(s.model || "-").padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + ` Duration        ${formatDuration(elapsedMs).padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + " ".repeat(58) + chalk.cyan("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Provider        ${(s.provider || "-").padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Model           ${(s.model || "-").padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Duration        ${formatDuration(elapsedMs).padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + " ".repeat(58) + chalk.hex("#6366F1")("│"));
     
-    console.log(chalk.cyan("│") + ` AI Requests     ${fmt(s.aiRequests).padEnd(41)}` + chalk.cyan("│"));
+    const reqStr = `${fmt(s.aiRequests)} requests (${s.turnCount} turns)`;
+    console.log(chalk.hex("#6366F1")("│") + ` AI Requests     ${reqStr.padEnd(41)}` + chalk.hex("#6366F1")("│"));
     
     const tokenStr = `${fmt(s.inputTokens + s.outputTokens)} (${fmt(s.inputTokens)} in • ${fmt(s.outputTokens)} out)`;
-    console.log(chalk.cyan("│") + ` Tokens          ${tokenStr.padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + " ".repeat(58) + chalk.cyan("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Tokens          ${tokenStr.padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Estimated Cost  ${costStr.padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + " ".repeat(58) + chalk.hex("#6366F1")("│"));
     
-    const fileStr = `${s.filesRead} read • ${s.filesModified} modified • ${s.filesCreated} created`;
-    console.log(chalk.cyan("│") + ` Files           ${fileStr.padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + ` Commands        ${fmt(s.shellCommands).padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + ` Tool Calls      ${fmt(s.toolCalls).padEnd(41)}` + chalk.cyan("│"));
-    console.log(chalk.cyan("│") + " ".repeat(58) + chalk.cyan("│"));
+    const fileStr = `${s.filesRead} read • ${s.filesModified} mod • ${s.filesCreated} new • ${s.filesDeleted} del`;
+    console.log(chalk.hex("#6366F1")("│") + ` Files           ${fileStr.padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    
+    const { workspace: ws, mcp, web, obsidian: obs, shell } = s.toolsByCategory;
+    const toolStr = `${fmt(s.toolCalls)} total (${ws} ws • ${mcp} mcp • ${web} web • ${shell} sh)`;
+    console.log(chalk.hex("#6366F1")("│") + ` Tool Calls      ${toolStr.padEnd(41)}` + chalk.hex("#6366F1")("│"));
+    console.log(chalk.hex("#6366F1")("│") + " ".repeat(58) + chalk.hex("#6366F1")("│"));
     
     let rawStatus = "";
     let statusText = "";
@@ -62,7 +67,7 @@ export function printSessionSummary() {
     }
     
     const statusSpace = " ".repeat(Math.max(0, 41 - rawStatus.length));
-    console.log(chalk.cyan("│") + ` Status          ${statusText}${statusSpace}` + chalk.cyan("│"));
+    console.log(chalk.hex("#6366F1")("│") + ` Status          ${statusText}${statusSpace}` + chalk.hex("#6366F1")("│"));
     
-    console.log(chalk.cyan("╰────────────────────────────────────────────────────────────╯"));
+    console.log(chalk.hex("#6366F1")("╰────────────────────────────────────────────────────────────╯"));
 }

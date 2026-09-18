@@ -46,20 +46,60 @@ export class ToolExecutor {
     private runWithActivity<T>(
         message: string,
         fn: () => T,
-        isSilent: boolean = false
+        isSilent: boolean = false,
+        toolName?: string,
+        args?: any
     ): T {
-        activityEvents.start(message);
+        const start = Date.now();
+        activityEvents.start({
+            message,
+            toolName,
+            args,
+            isSilent,
+        });
 
         try {
             const result = fn();
+            if (result instanceof Promise) {
+                return (result as Promise<any>)
+                    .then((val) => {
+                        const durationMs = Date.now() - start;
+                        if (toolName) {
+                            sessionTracker.recordToolExecution(toolName, durationMs, true);
+                        }
+                        if (isSilent) {
+                            activityEvents.silentFinish({ message, toolName, args, durationMs, isSilent: true });
+                        } else {
+                            activityEvents.finish({ message, toolName, args, durationMs, isSilent: false });
+                        }
+                        return val;
+                    })
+                    .catch((err) => {
+                        const durationMs = Date.now() - start;
+                        if (toolName) {
+                            sessionTracker.recordToolExecution(toolName, durationMs, false);
+                        }
+                        activityEvents.fail({ message, toolName, args, durationMs, isSilent });
+                        throw err;
+                    }) as unknown as T;
+            }
+
+            const durationMs = Date.now() - start;
+            if (toolName) {
+                sessionTracker.recordToolExecution(toolName, durationMs, true);
+            }
             if (isSilent) {
-                activityEvents.silentFinish(message);
+                activityEvents.silentFinish({ message, toolName, args, durationMs, isSilent: true });
             } else {
-                activityEvents.finish(message);
+                activityEvents.finish({ message, toolName, args, durationMs, isSilent: false });
             }
             return result;
         } catch (err) {
-            activityEvents.fail(message);
+            const durationMs = Date.now() - start;
+            if (toolName) {
+                sessionTracker.recordToolExecution(toolName, durationMs, false);
+            }
+            activityEvents.fail({ message, toolName, args, durationMs, isSilent });
             throw err;
         }
     }

@@ -10,7 +10,7 @@ import { getAgentModel } from "../../ai/ai.config";
 import { renderTerminalMarkdown } from "../../tui/terminal-md";
 import { runApprovalFlow } from "./approval";
 import { createWebTools } from "../plan/web-tools";
-import { activity } from "../../tui/activity";
+import { activity, formatToolCallBadge } from "../../tui/activity";
 import { activityEvents } from "./activity-events";
 import { sessionTracker } from "../../ai/session/session-tracker";
 import { getAITools } from "../../mcp";
@@ -100,41 +100,33 @@ function getToolMessage(toolName: string, input: any): string {
     }
 }
 
-function formatToolCallBadge(toolName: string, args: any): string {
-
-    let sourceBadge = chalk.bgHex("#334155").white.bold(" WORKSPACE ");
-    if (toolName.startsWith("youtube_")) {
-        sourceBadge = chalk.bgHex("#FF0000").white.bold(" MCP: YOUTUBE ");
-    } else if (toolName.startsWith("github_")) {
-        sourceBadge = chalk.bgHex("#24292E").white.bold(" MCP: GITHUB ");
-    } else if (toolName.startsWith("web_") || toolName === "fetch_url") {
-        sourceBadge = chalk.bgHex("#0284C7").white.bold(" WEB ");
-    } else if (toolName.startsWith("obsidian_")) {
-        sourceBadge = chalk.bgHex("#7C3AED").white.bold(" OBSIDIAN ");
-    }
-
-    const argsObj = args ?? {};
-    const argsSummary = Object.entries(argsObj)
-        .map(([k, v]) => `${chalk.dim(k)}=${chalk.cyan(typeof v === "string" ? `"${v}"` : JSON.stringify(v))}`)
-        .join(" ");
-
-    const formattedArgs = argsSummary ? chalk.dim(` (${argsSummary})`) : "";
-    return `${sourceBadge} ${chalk.bold.white(toolName)}${formattedArgs}`;
-}
-
-
-
 export async function runAgentMode(initialGoal?: string) {
     console.log(chalk.bold("Running Agent Mode"));
     activityEvents.clear();
-    activityEvents.onStart(msg => {
+    activityEvents.onStart((msg) => {
         if (!activity.isBusy) activity.start(msg);
         else activity.update(msg);
     });
-    activityEvents.onFinish(msg => activity.update(msg + chalk.green(" ✓")));
-    activityEvents.onSilentFinish(msg => activity.update(msg + chalk.dim(" ✓")));
-    activityEvents.onFail(msg => {
-        activity.update(chalk.red("Failed: " + msg));
+    activityEvents.onFinish((msg, data) => {
+        if (data?.toolName) {
+            activity.logCompletedAction(data.toolName, data.args, data.durationMs, true, msg);
+        } else {
+            activity.update(msg + chalk.green(" ✓"));
+        }
+    });
+    activityEvents.onSilentFinish((msg, data) => {
+        if (data?.toolName) {
+            activity.logCompletedAction(data.toolName, data.args, data.durationMs, true, msg);
+        } else {
+            activity.update(msg + chalk.dim(" ✓"));
+        }
+    });
+    activityEvents.onFail((msg, data) => {
+        if (data?.toolName) {
+            activity.logCompletedAction(data.toolName, data.args, data.durationMs, false, chalk.red("Failed: " + msg));
+        } else {
+            activity.update(chalk.red("Failed: " + msg));
+        }
     });
 
 
@@ -187,6 +179,9 @@ export async function runAgentMode(initialGoal?: string) {
         let result;
 
         try {
+            sessionTracker.startTurn();
+            let currentStep = 1;
+            activity.setStep(currentStep, 40);
             activity.start("Parsing file mentions...");
             
             let finalInput = currentInput;
@@ -198,13 +193,16 @@ export async function runAgentMode(initialGoal?: string) {
                 }
             }
 
-            //Loader
+            // Loader
             activity.start("Thinking...");
 
             const allToolCalls: { toolName: string; args: any }[] = [];
 
             const generateOpts: any = {
                 onStepFinish: ({ toolCalls, usage }: any) => {
+                    currentStep++;
+                    activity.setStep(Math.min(currentStep, 40), 40);
+
                     if (usage) {
                         const u = usage as any;
                         sessionTracker.addTokens(
@@ -217,6 +215,15 @@ export async function runAgentMode(initialGoal?: string) {
                         sessionTracker.incrementToolCalls();
                         const args = tc.args ?? tc.input ?? {};
                         allToolCalls.push({ toolName: tc.toolName, args });
+                        
+                        // Live log to activity feed so user sees progress immediately
+                        activity.logCompletedAction(tc.toolName, args);
+                        activity.update(getToolMessage(tc.toolName, args));
+                    }
+
+                    // Force a refresh of the spinner with updated stats even if no tool was called
+                    if (!toolCalls || toolCalls.length === 0) {
+                        activity.update("Thinking...");
                     }
                 }
             };
@@ -230,9 +237,10 @@ export async function runAgentMode(initialGoal?: string) {
             result = await agent.stream(generateOpts);
 
             const responseText = await result.text;
+            sessionTracker.endTurn();
             
             if (activity.isBusy) {
-                activity.stop("Agent Finished");
+                activity.stop();
             }
 
             if (responseText || allToolCalls.length > 0) {
@@ -241,14 +249,6 @@ export async function runAgentMode(initialGoal?: string) {
 
             if (responseText) {
                 console.log(renderTerminalMarkdown(responseText));
-            }
-
-            if (allToolCalls.length > 0) {
-                console.log(chalk.bold.cyan("\n🛠️  MCP & Tools Executed:"));
-                for (const tc of allToolCalls) {
-                    console.log(chalk.green("  ✔ "), formatToolCallBadge(tc.toolName, tc.args));
-                }
-                console.log();
             }
 
         } catch (err) {
