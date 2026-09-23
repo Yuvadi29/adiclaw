@@ -1,23 +1,11 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { createOllama } from "ai-sdk-ollama";
-import { aiSession } from "./session";
+import { inferenceEngine } from "../inference";
+import type { InferenceMode } from "../inference/types";
 
-const openRouter = createOpenRouter({
-    apiKey: process.env.OPENROUTER_API_KEY!,
-
-});
-const ollama = createOllama();
-
-export function getAgentModel() {
-    const session = aiSession.get();
-    switch (session.provider) {
-        case "ollama":
-        default:
-            return ollama(session.model);
-
-        case "openrouter":
-            return openRouter(session.model);
-
-    }
-
-};
+/**
+ * Returns an inference-optimized LanguageModel powered by the AdiClaw Inference Engine.
+ * Transparently applies TTFT pre-warming, prompt optimization, prefix caching,
+ * turn delta compression, and real-time telemetry.
+ */
+export function getAgentModel(mode?: InferenceMode) {
+  return inferenceEngine.getModel(mode);
+}

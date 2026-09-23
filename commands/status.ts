@@ -4,6 +4,9 @@ import { aiSession } from "../ai/session";
 import { sessionTracker } from "../ai/session/session-tracker";
 import { workspace } from "../workspace/index";
 
+import { inferenceEngine } from "../inference";
+import { promptPrefixCache } from "../inference/cache/prompt-cache";
+
 function visibleLength(str: string): number {
     // Strip ANSI escape codes to get accurate visible character length
     return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "").length;
@@ -17,6 +20,8 @@ export const statusCommand: Command = {
         const sess = aiSession.get();
         const metrics = sessionTracker.get();
         const stats = workspace.getStats();
+        const infStatus = inferenceEngine.getStatus();
+        const cacheStats = promptPrefixCache.getStats();
 
         const elapsed = Date.now() - metrics.startedAt;
         const mins = Math.floor(elapsed / 60_000);
@@ -62,6 +67,15 @@ export const statusCommand: Command = {
         console.log(padLine(`  ${label("Model:")} ${val(sess.model || "default")}`));
         console.log(padLine(`  ${label("Uptime:")} ${val(uptimeStr)}`));
         console.log(padLine(`  ${label("AI Requests:")} ${val(fmt(metrics.aiRequests))} ${chalk.dim(`(${metrics.turnCount} turns)`)}`));
+
+        console.log(border("├" + "─".repeat(width - 2) + "┤"));
+
+        // Inference Engine Telemetry Section
+        console.log(padLine(chalk.hex("#22D3EE").bold("🚀 INFERENCE ENGINE TELEMETRY")));
+        const ttftStr = infStatus.averageTTFT > 0 ? `${infStatus.averageTTFT} ms` : "Ready";
+        const tpsStr = infStatus.averageTPS > 0 ? `${infStatus.averageTPS} tok/s` : "Ready";
+        console.log(padLine(`  ${label("Avg TTFT:")} ${chalk.greenBright.bold(ttftStr)} • ${label("Avg TPS:").trim()} ${chalk.yellowBright.bold(tpsStr)}`));
+        console.log(padLine(`  ${label("Prefix Cache:")} ${chalk.cyanBright.bold(`${cacheStats.hitRatePercentage}% hit rate`)} ${chalk.dim(`(${cacheStats.totalTokensSaved.toLocaleString()} tokens saved)`)}`));
 
         console.log(border("├" + "─".repeat(width - 2) + "┤"));
 

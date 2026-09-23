@@ -7,6 +7,8 @@ import { runREPL } from "./repl";
 import { memory } from "../memory";
 import { setYouTubeSession } from "../youtube/session";
 
+import { inferenceEngine } from "../inference";
+
 const BANNER_FONT = "ANSI Shadow";
 const SHADOW = chalk.hex("#818CF8");
 const PRIMARY = chalk.hex("#E0E7FF");
@@ -54,7 +56,7 @@ async function printBannerWithShadow(ascii: string) {
 async function bootSequence() {
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-  const steps = ["Initializing runtime", "Loading tools"];
+  const steps = ["Initializing inference engine", "Loading tools", "Pre-warming active model weights"];
 
   for (const step of steps) {
     let currentFrame = 0;
@@ -99,6 +101,7 @@ export async function runWakeUp() {
   });
 
   sessionTracker.start(config.providerName, config.model);
+  inferenceEngine.warmup(config.model, config.provider).catch(() => {});
 
   await bootSequence();
 

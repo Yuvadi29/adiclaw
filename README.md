@@ -1,6 +1,6 @@
 # 🐾 AdiClaw
 
-> **An autonomous, sandboxed AI CLI coding assistant & planning engine built with Bun, TypeScript, Vercel AI SDK, OpenRouter, and Firecrawl.**
+> **An autonomous, sandboxed AI CLI coding assistant & high-performance inference engine built with Bun, TypeScript, Vercel AI SDK, Ollama, OpenRouter, and Firecrawl.**
 
 ## 🎥 Demo
 
@@ -10,35 +10,39 @@
 
 ## 🌟 Overview
 
-**AdiClaw** is a modern terminal-native AI coding assistant designed for safety, control, and intelligence. Unlike traditional AI tools that modify your codebase blindly, AdiClaw operates on a **Staging + Approval Architecture**:
+**AdiClaw** is a modern terminal-native AI coding assistant designed for safety, control, and blazing-fast inference. Unlike traditional AI tools that modify your codebase blindly, AdiClaw operates on a **Staging + Approval Architecture**:
 
 1. **In-Memory Overlay Staging:** All file creations, modifications, deletions, and shell commands are staged in memory first.
 2. **Interactive Diff Review:** Unified git diffs are rendered directly in your terminal for each proposed change.
 3. **Human-in-the-Loop Control:** Approve all changes at once, review step-by-step, or cancel with zero risk to your filesystem.
+4. **Dedicated Inference Engine:** Sits between the CLI modes and model runtimes, applying TTFT pre-warming, invariant prompt prefix caching, turn delta compression, and Apple Silicon Metal acceleration.
 
 ---
 
 ## ✨ Key Features
 
+- **🚀 Dedicated Inference Engine:** Minimizes latency (TTFT) and maximizes throughput (TPS) with local Ollama runtimes and cloud providers via Vercel AI SDK middleware.
+- **⚡ Apple Silicon Metal Acceleration:** Automatically tunes thread pinning to performance cores, Metal GPU offloading, and right-sized KV caching.
 - **🤖 Sandboxed Agent Mode:** Autonomous tool loop (up to 40 steps) to read, search, plan, and stage codebase modifications safely.
 - **🧭 Structured Plan Mode:** Researches your codebase and web resources to generate structured 1-15 step execution plans with complexity estimation (`low`, `medium`, `high`). Select and execute specific steps interactively.
-- **❓ Ask Mode:** Read-only Q&A mode to query your codebase or external web URLs. Export answers directly into markdown files (`.md`).
+- **❓ Ask Mode:** Read-only Q&A mode with native local filesystem inspection (`read_file`, `list_files`, `analyze_codebase`) and external web research. Export answers directly into markdown files (`.md`).
+- **🔌 Model Context Protocol (MCP):** Native MCP support including Coding Adda YouTube analytics/dashboard and GitHub repository interaction.
 - **🌐 Web Scraping & Search:** Powered by **Firecrawl API** (`web_search`, `web_crawl`, `fetch_url`) to scrape live documentation and search the web.
-- **🎨 Terminal UI (TUI):** Built with `@clack/prompts`, `chalk`, `figlet`, and `marked-terminal` for interactive menus and syntax-highlighted Markdown/Diff outputs.
+- **🎨 Terminal UI (TUI):** Built with `@clack/prompts`, `chalk`, `figlet`, and `marked-terminal` for interactive menus, file autocomplete (`@`), command dropdowns (`/`), and syntax-highlighted Markdown/Diff outputs.
 - **⚡ Powered by Bun:** Ultra-fast startup and native TypeScript runtime.
 
 ---
 
 ## 🆕 Recent Updates
 
-- **GitHub MCP Server Integration:** Seamless connection and interaction with GitHub repositories.
-- **Task Tracker & Obsidian Knowledge Base:** Built-in task tracking and knowledge base support using Obsidian, along with a test skill for generating project test cases.
-- **Slash Commands Structure:** Revamped Terminal UI driven by intuitive slash commands (`/help`, `/model`, `/agent`, `/ask`, `/plan`, `/status`, `/clear`, `/exit`).
-- **File & Folder Indexing:** Enhanced local search capabilities with comprehensive workspace indexing.
-- **Continuous Chat & Tools in Ask Mode:** Ask mode now supports a continuous chat loop and tool execution.
-- **Streaming Responses:** Real-time streaming output available across all modes for better UX.
-- **Session Reports & Activity Tracking:** Detailed end-of-session reports and activity tracking for every mode.
-- **UI & Performance Enhancements:** Added UI dropdowns and patched memory leaks for a smoother experience.
+- **AdiClaw Inference Engine:** Built-in inference optimization layer featuring prefix caching, turn delta compression, and real-time TTFT/TPS telemetry.
+- **Apple Silicon Hardware Tuning:** Transparent GPU offloading and performance core thread optimization on macOS.
+- **Inference Diagnostics (`/inference`):** Real-time telemetry inspects TTFT, throughput, prefix cache hit rate, and provides on-demand model weight pre-warming (`/inference warmup`).
+- **End-to-End Tool Execution in Ask Mode:** Native local tool execution to immediately analyze codebase structure without unnecessary prompts for external repositories.
+- **GitHub & YouTube MCP Integrations:** Seamless connection and interaction with GitHub repositories and Coding Adda YouTube channel metrics.
+- **Task Tracker & Obsidian Knowledge Base:** Built-in task tracking and knowledge base support using Obsidian notes.
+- **Interactive Slash Commands:** Fast terminal command routing (`/help`, `/model`, `/inference`, `/agent`, `/ask`, `/plan`, `/youtube`, `/status`, `/clear`, `/exit`).
+- **Continuous Workspace Indexing:** High-speed scanning and caching of codebase files for instant search and tool retrieval.
 
 ---
 
@@ -49,15 +53,25 @@
                                  │
                                  ▼
                      ┌───────────────────────┐
-                     │   CLI Sub-Mode Selection│
+                     │   CLI Sub-Mode Router │
                      │  (Agent | Plan | Ask) │
+                     └───────────┬───────────┘
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │ AdiClaw Inference     │
+                     │ Engine & Optimizer    │
+                     │ - TTFT Pre-Warming    │
+                     │ - Prefix Caching      │
+                     │ - Turn Delta Compress │
+                     │ - Metal GPU Offload   │
                      └───────────┬───────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
          ▼                       ▼                       ▼
  ┌───────────────┐       ┌───────────────┐       ┌───────────────┐
- │  Agent Mode   │       │   Plan Mode   │       │   Ask Mode    │
- │ (40-step loop)│       │ (Research/Plan│       │ (Read-only Q&A│
+ │ Local Ollama  │       │  llama.cpp    │       │  OpenRouter   │
+ │ (Metal / GPU) │       │ (Local GGUF)  │       │ (Cloud API)   │
  └───────┬───────┘       └───────┬───────┘       └───────┬───────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
@@ -84,7 +98,22 @@
 
 ---
 
-## 🛠️ CLI Modes
+## 🛠️ CLI Modes & Commands
+
+### Slash Commands
+
+| Command | Description |
+|---|---|
+| `/agent [goal]` | Launch autonomous agent mode with in-memory staging & diff reviews |
+| `/plan [goal]` | Deconstruct goals into structured multi-step plans with selective execution |
+| `/ask [query]` | Read-only codebase and external research with local tool execution |
+| `/inference` | View inference telemetry (TTFT, TPS, cache hit rate) or pre-warm models |
+| `/model` | Switch model or runtime provider interactively (Ollama / OpenRouter) |
+| `/youtube` | Launch Coding Adda YouTube dashboard and analytics |
+| `/status` | View session metrics, active provider, token costs, and cache savings |
+| `/help` | Display command reference and keybindings |
+| `/clear` | Clear the terminal screen |
+| `/exit` | Gracefully shut down AdiClaw |
 
 ### 🤖 1. Agent Mode
 Execute complex development tasks across your workspace. The agent reads, searches, and modifies files, staging all changes in an append-only tracker.
@@ -99,10 +128,31 @@ Deconstruct complex goals into actionable implementation steps before writing an
 4. **Staged Execution & Approval:** Executes selected steps sequentially and presents unified diffs for review.
 
 ### ❓ 3. Ask Mode
-Ask questions about your codebase or external documentation URLs (e.g. `https://chaicode.com/`):
+Ask questions about your codebase or external documentation URLs:
 - Operates in read-only mode (no filesystem modifications except optional markdown export).
+- Automatically inspects the local codebase (`analyze_codebase`, `list_files`, `read_file`) to answer project questions.
 - Renders answers in rich terminal Markdown.
 - Prompts to optionally export Q&A logs to a local `.md` file.
+
+---
+
+## ⚡ Inference Engine & Hardware Acceleration
+
+AdiClaw includes a dedicated inference optimization engine to maximize generation speed and minimize latency:
+
+- **Apple Silicon Hardware Tuning:** Automatically inspects CPU core topology (Performance vs Efficiency cores), offloads to Metal GPU (`num_gpu: 99`), and optimizes prompt batching.
+- **Context Window Management:** Right-sized KV context (`16,384` tokens) comfortably accommodates all local tools, MCP tools (GitHub & YouTube), and workspace files without context degradation.
+- **Prompt Prefix Caching:** Memoizes invariant system prompts and tool schemas to accelerate repeated turns.
+- **Turn Delta Compression:** Compresses older conversation turns during long-running agent loops while keeping the most recent turns uncompressed.
+- **Telemetry & Monitoring:** Intercepts stream chunks to track Time-To-First-Token (TTFT) and throughput (TPS) live.
+
+```bash
+# Check inference telemetry & cache metrics
+adiclaw > /inference
+
+# Pre-warm model weights into Unified Memory
+adiclaw > /inference warmup
+```
 
 ---
 
@@ -111,8 +161,10 @@ Ask questions about your codebase or external documentation URLs (e.g. `https://
 ### Prerequisites
 
 - [Bun](https://bun.sh) (v1.0.0 or higher)
-- OpenRouter API Key (for LLM model inference)
+- [Ollama](https://ollama.com) (Recommended for local inference, e.g. `gemma4:latest`, `qwen2.5-coder`)
+- OpenRouter API Key *(Optional, for cloud model inference)*
 - Firecrawl API Key *(Optional, for web searching & crawling)*
+- GitHub Personal Access Token *(Optional, for GitHub MCP tools)*
 
 ### Installation
 
@@ -130,9 +182,17 @@ Ask questions about your codebase or external documentation URLs (e.g. `https://
 3. **Configure Environment Variables:**
    Create a `.env` file in the root directory:
    ```env
+   # Local Model Configuration (Ollama)
+   ADICLAW_PROVIDER=ollama
+   ADICLAW_MODEL=gemma4:latest
+
+   # Cloud Model Configuration (OpenRouter)
    OPENROUTER_API_KEY=your_openrouter_api_key
-   OPENROUTER_DEFAULT_MODEL="openrouter/free" # Or your preferred model
-   FIRECRAWL_API_KEY=your_firecrawl_api_key   # Optional for web scraping
+   OPENROUTER_DEFAULT_MODEL="openrouter/free"
+
+   # Optional Integrations
+   FIRECRAWL_API_KEY=your_firecrawl_api_key
+   GITHUB_PERSONAL_ACCESS_TOKEN=your_github_token
    ```
 
 ---
@@ -154,7 +214,7 @@ bun index.ts wakeup
 ### CLI Sub-Commands
 
 ```bash
-adiclaw wakeup     # Launches the banner menu to select CLI or Telegram modes
+adiclaw wakeup     # Launches the banner menu and REPL
 adiclaw new        # Create a new adiclaw project
 ```
 
@@ -166,28 +226,39 @@ adiclaw new        # Create a new adiclaw project
 adiclaw/
 ├── index.ts                     # CLI Entry point (Commander.js)
 ├── ai/
-│   └── ai.config.ts             # OpenRouter provider setup via Vercel AI SDK
+│   ├── ai.config.ts             # Inference Engine model integration
+│   ├── provider.ts              # Provider interface
+│   └── session/                 # Session management & token tracker
+├── inference/                   # 🚀 AdiClaw Inference Engine
+│   ├── engine.ts                # Core engine orchestration
+│   ├── adapter.ts               # Vercel AI SDK middleware wrapper
+│   ├── hardware.ts              # Apple Silicon Metal hardware detection & tuning
+│   ├── manager.ts               # Model pre-warming & keep-alive manager
+│   ├── types.ts                 # Inference request/response & metrics types
+│   ├── cache/                   # Prompt prefix cache & context optimizer
+│   ├── router/                  # Mode-aware runtime routing
+│   ├── runtimes/                # Ollama, llama.cpp, OpenRouter runtimes
+│   └── telemetry/               # TTFT, TPS, and status metrics collector
+├── commands/                    # Slash command definitions & router
+│   ├── agent.ts                 # /agent command
+│   ├── ask.ts                   # /ask command
+│   ├── plan.ts                  # /plan command
+│   ├── inference.ts             # /inference telemetry & warmup
+│   ├── model.ts                 # /model switcher
+│   ├── status.ts                # /status dashboard
+│   └── youtube.ts               # /youtube analytics
+├── mcp/                         # Model Context Protocol registry & providers
+│   ├── providers/github.ts      # GitHub MCP provider
+│   └── providers/youtube.ts     # YouTube MCP provider
 ├── modes/
-│   ├── cli.ts                   # Sub-mode selection menu
-│   ├── agent/
-│   │   ├── action-tracker.ts    # Append-only action logging
-│   │   ├── agent-tools.ts       # Tool definitions (Vercel AI SDK)
-│   │   ├── approval.ts          # Interactive CLI diff review flow
-│   │   ├── diff-view.ts         # Unified git patch generator
-│   │   ├── orchestrator.ts      # Agent mode execution loop
-│   │   ├── tool-executor.ts     # In-memory filesystem overlay & staging
-│   │   └── types.ts             # Type definitions & config presets
-│   ├── ask/
-│   │   └── orchestrator.ts      # Read-only Q&A mode orchestrator
-│   └── plan/
-│       ├── orchestrator.ts      # Plan mode orchestrator
-│       ├── planner.ts           # Plan drafting & JSON schema validation
-│       ├── selection.ts         # Multi-select step prompt UI
-│       ├── types.ts             # Plan & step interfaces
-│       └── web-tools.ts         # Firecrawl web search & crawl integration
+│   ├── agent/                   # Autonomous coding agent loop & tools
+│   ├── ask/                     # Read-only Q&A orchestrator
+│   └── plan/                    # Multi-step goal planner
+├── workspace/                   # Local file scanner, summary & cache
 └── tui/
-    ├── terminal-md.ts           # Terminal Markdown renderer (marked + marked-terminal)
-    └── wakeup.ts                # ASCII Figlet banner & main menu
+    ├── repl.ts                  # Interactive readline REPL with / and @ triggers
+    ├── terminal-md.ts           # Terminal Markdown renderer
+    └── wakeup.ts                # ASCII Figlet banner & boot sequence
 ```
 
 ---
@@ -195,7 +266,9 @@ adiclaw/
 ## 🧰 Tech Stack
 
 - **Runtime:** [Bun](https://bun.sh)
-- **AI Integration:** [Vercel AI SDK](https://sdk.vercel.ai/docs), [`@openrouter/ai-sdk-provider`](https://www.npmjs.com/package/@openrouter/ai-sdk-provider)
+- **Inference Optimization:** Custom AdiClaw Engine (TTFT Pre-Warming, Prefix Caching, Metal Acceleration)
+- **AI Integration:** [Vercel AI SDK](https://sdk.vercel.ai/docs), [Ollama](https://ollama.ai), [`@openrouter/ai-sdk-provider`](https://www.npmjs.com/package/@openrouter/ai-sdk-provider)
+- **Protocol:** [Model Context Protocol (MCP)](https://modelcontextprotocol.io)
 - **Web Crawling:** [`@mendable/firecrawl-js`](https://www.npmjs.com/package/@mendable/firecrawl-js)
 - **CLI Framework:** [Commander.js](https://github.com/tj/commander.js)
 - **Terminal UI & Styling:** [`@clack/prompts`](https://github.com/natemoo-re/clack), [`chalk`](https://github.com/chalk/chalk), [`figlet`](https://github.com/patorjk/figlet.js), [`marked-terminal`](https://github.com/mscdex/marked-terminal)

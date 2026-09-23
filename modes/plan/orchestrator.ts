@@ -97,7 +97,7 @@ export async function runPlanMode(initialGoal?: string): Promise<void> {
     activity.start(`🔧 ${step.title}`);
 
     const agent = new ToolLoopAgent({
-      model: getAgentModel(),
+      model: getAgentModel("plan"),
       stopWhen: stepCountIs(30),
       instructions: buildSystemPrompt({
           mode: "agent",

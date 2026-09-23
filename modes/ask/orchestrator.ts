@@ -139,15 +139,17 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
     };
 
     const agent = new ToolLoopAgent({
-        model: getAgentModel(),
+        model: getAgentModel("ask"),
         stopWhen: stepCountIs(20),
         instructions: [
-            "You are a helpful AI assistant. You have access to tools that can read the file system and query external services via Model Context Protocol (MCP).",
-            "YOU MUST USE THESE TOOLS natively to answer the user's questions.",
-            "DO NOT write scripts to read files. DO NOT hallucinate file contents. ALWAYS use the `read_file` or `search_files` tool first to gather information.",
-            "CRITICAL: You are in READ-ONLY mode. You CANNOT create, modify, or delete files. If the user asks you to create a file, you MUST inform them to use /agent or /plan mode instead.",
-            `Workspace root: ${config.codebasePath}`,
+            "You are a helpful AI assistant with native access to the user's local filesystem and workspace tools.",
+            `Active project directory (Workspace root): ${config.codebasePath}`,
             gitRemoteText,
+            "CRITICAL: When the user asks what the project does, or asks about the codebase, architecture, or features:",
+            "- YOU MUST IMMEDIATELY use local workspace tools: 'analyze_codebase', 'list_files', and 'read_file' (start with README.md or package.json).",
+            "- DO NOT ask the user for a GitHub URL or repository owner/name — this local workspace IS the project you are examining!",
+            "- DO NOT hallucinate file contents. DO NOT write shell scripts to read files. Use your tools natively.",
+            "CRITICAL: You are in READ-ONLY mode. You CANNOT create, modify, or delete files. If the user asks you to create a file, you MUST inform them to use /agent or /plan mode instead.",
             hasWeb
                 ? "Web tools are available (web_search, web_crawl, fetch_url). Use web_crawl or fetch_url to scrape content from URLs when requested."
                 : "Web tools are unavailable.",
@@ -158,9 +160,9 @@ export async function runAskMode(initialQuestion?: string): Promise<void> {
             "  * Use `youtube_channel` for channel subscriber count and overview.",
             "  * Use `youtube_search_videos` to search videos by topic.",
             "  * Use `youtube_list_videos` with order='date' for latest uploads.",
-            "- For GitHub questions (issues, pull requests, repository info), use the relevant `github_*` MCP tools.",
+            "- For GitHub questions (issues, pull requests, external repository info), use the relevant `github_*` MCP tools.",
             "CRITICAL RULES FOR OBSIDIAN VAULT:",
-            "1. Whenever you are asked to work on a project, search for notes, or check Obsidian, you MUST use the 'obsidian_search' tool first.",
+            "1. Whenever you are asked to search for notes or check Obsidian, you MUST use the 'obsidian_search' tool first.",
             "2. DO NOT use 'search_files' or 'list_files' to look for Obsidian notes. The vault is outside the workspace and ONLY accessible via 'obsidian_search' and 'obsidian_read'.",
         ].join("\n"),
         tools,

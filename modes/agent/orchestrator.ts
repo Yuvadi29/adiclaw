@@ -160,7 +160,7 @@ export async function runAgentMode(initialGoal?: string) {
 
     // Create the tool loop
   const agent = new ToolLoopAgent({
-    model: getAgentModel(),
+    model: getAgentModel("agent"),
     stopWhen: stepCountIs(40),
         instructions: buildSystemPrompt({
           mode: "agent",
